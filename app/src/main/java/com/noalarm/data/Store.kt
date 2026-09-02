@@ -181,7 +181,8 @@ object Store {
         put("defaultAutoSilenceMinutes", s.defaultAutoSilenceMinutes)
         put("volumeKeyAction", s.volumeKeyAction.name); put("powerKeyAction", s.powerKeyAction.name)
         put("flipAction", s.flipAction.name); put("shakeAction", s.shakeAction.name)
-        put("glyphEnabled", s.glyphEnabled); put("glyphToyClock", s.glyphToyClock)
+        put("glyphEnabled", s.glyphEnabled); put("glyphAppChannel", s.glyphAppChannel)
+        put("glyphToyClock", s.glyphToyClock)
         put("timerSoundUri", s.timerSoundUri ?: JSONObject.NULL)
         put("worldClocks", JSONArray(s.worldClocks)); put("homeZone", s.homeZone)
         put("bedtimeEnabled", s.bedtimeEnabled)
@@ -205,6 +206,7 @@ object Store {
         flipAction = key(o, "flipAction", KeyAction.NONE),
         shakeAction = key(o, "shakeAction", KeyAction.NONE),
         glyphEnabled = o.optBoolean("glyphEnabled", true),
+        glyphAppChannel = o.optBoolean("glyphAppChannel", false),
         glyphToyClock = o.optBoolean("glyphToyClock", true),
         timerSoundUri = if (o.isNull("timerSoundUri")) null else o.optString("timerSoundUri"),
         worldClocks = strings(o, "worldClocks"),

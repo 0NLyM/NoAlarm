@@ -122,6 +122,8 @@ data class Settings(
     val flipAction: KeyAction = KeyAction.NONE,
     val shakeAction: KeyAction = KeyAction.NONE,
     val glyphEnabled: Boolean = true,
+    /** true = setAppMatrixFrame invece di setMatrixFrame. Vedi la schermata di prova. */
+    val glyphAppChannel: Boolean = false,
     val glyphToyClock: Boolean = true,
     val timerSoundUri: String? = null,
     val worldClocks: List<String> = emptyList(),

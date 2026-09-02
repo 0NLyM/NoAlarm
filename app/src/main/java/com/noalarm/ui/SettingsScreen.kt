@@ -16,6 +16,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -36,6 +39,7 @@ private fun label(a: KeyAction) = when (a) {
 fun SettingsScreen() {
     val context = LocalContext.current
     val s by Store.settings.collectAsStateWithLifecycle()
+    var glyphTest by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -89,6 +93,11 @@ fun SettingsScreen() {
         SwitchRow("Usa la matrice mentre suona", s.glyphEnabled) { v ->
             Store.update { it.copy(glyphEnabled = v) }
         }
+        RowItem(
+            title = "Prova la matrice",
+            subtitle = "Accende la Glyph e mostra cosa risponde il dispositivo",
+            onClick = { glyphTest = true },
+        )
         Text(
             "Richiede un Nothing Phone (3). Sugli altri dispositivi resta inattiva.",
             Modifier.padding(horizontal = 4.dp),
@@ -131,6 +140,8 @@ fun SettingsScreen() {
         RowItem(title = "Versione", subtitle = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         Spacer(Modifier.height(48.dp))
     }
+
+    if (glyphTest) GlyphTestSheet { glyphTest = false }
 }
 
 /** Riga che cicla fra i valori possibili a ogni tocco: niente menu, niente dialog. */

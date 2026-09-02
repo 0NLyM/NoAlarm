@@ -43,8 +43,8 @@ import kotlin.math.roundToInt
 // Geometria della griglia, in celle di punti.
 private const val DIGIT_H = DotFont.H          // 7 righe per cifra
 private const val ITEM_H = DIGIT_H + 4         // passo fra due valori del rullo
-private const val ROWS = DIGIT_H               // la griglia e' alta quanto una cifra
-private val TOUCH_H = 132.dp                   // area di trascinamento, piu' alta della griglia
+private const val GRID_ROWS = DIGIT_H          // lo sfondo acceso e' alto quanto una cifra
+private const val VIEW_ROWS = 19               // ma il carosello si vede anche sopra e sotto
 private const val PAIR_W = 11                  // due cifre: 5 + 1 + 5
 private val CELL = 8.dp
 
@@ -52,9 +52,10 @@ private val CELL = 8.dp
  * Selettore dell'orario in stile Nothing.
  *
  * La griglia di punti spenti e' **fissa** e alta quanto una cifra, come una riga
- * di LED: quello che scorre sono solo i punti accesi, che si spostano di una
- * cella alla volta mentre trascini. L'area sensibile al dito e' piu' alta della
- * griglia, cosi' il gesto resta comodo.
+ * di LED accesa in mezzo al buio: quello che scorre sono solo i punti accesi,
+ * che si spostano di una cella alla volta. Le cifre vicine restano visibili
+ * sopra e sotto la riga, fuori dallo sfondo, sbiadite: danno il senso del
+ * movimento senza contendere la lettura a quella selezionata.
  */
 @Composable
 fun DotTimePicker(
@@ -89,15 +90,16 @@ fun DotTimePicker(
     val minuteCol = colonCol + DotFont.W + 3
     val cols = minuteCol + PAIR_W
     val width = CELL * cols
-    val height = CELL * ROWS
+    val height = CELL * VIEW_ROWS
+    val bandTop = (VIEW_ROWS - GRID_ROWS) / 2
 
     Row(modifier, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.width(width).height(TOUCH_H), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(width, height)) {
             Canvas(Modifier.size(width, height)) {
                 val p = cellPx
                 val r = p * 0.34f
-                // La griglia spenta: sempre la stessa, non si muove mai.
-                for (y in 0 until ROWS) for (x in 0 until cols) {
+                // Lo sfondo spento: solo la riga centrale, e non si muove mai.
+                for (y in bandTop until bandTop + GRID_ROWS) for (x in 0 until cols) {
                     drawCircle(off, r, Offset(x * p + p / 2, y * p + p / 2))
                 }
                 wheel(hours, hourPos.value, 0, p, r, on)
@@ -105,7 +107,7 @@ fun DotTimePicker(
                 // I due punti restano fermi al centro e lampeggiano al secondo.
                 if (blink) {
                     val colon = DotFont.render(":", 0)
-                    val top = (ROWS - DIGIT_H) / 2
+                    val top = bandTop
                     for (y in 0 until DIGIT_H) for (x in 0 until DotFont.W) {
                         if (colon[y][x]) drawCircle(
                             accent, r,
@@ -178,12 +180,12 @@ private fun DragArea(width: Dp, itemPx: Float, pos: Animatable<Float, AnimationV
                     scope.launch { pos.snapTo(pos.value - delta / itemPx) }
                 },
                 onDragStopped = { velocity ->
-                    // Poco attrito: il carosello continua a girare in proporzione
-                    // alla velocita' del gesto, poi si aggancia al valore piu' vicino.
-                    pos.animateDecay(-velocity / itemPx, exponentialDecay(frictionMultiplier = 0.3f))
+                    // Il carosello segue la velocita' del gesto ma frena presto:
+                    // deve restare leggibile, non girare come una slot machine.
+                    pos.animateDecay(-velocity / itemPx, exponentialDecay(frictionMultiplier = 0.9f))
                     pos.animateTo(
                         pos.value.roundToInt().toFloat(),
-                        spring(dampingRatio = 0.9f, stiffness = 500f),
+                        spring(dampingRatio = 1f, stiffness = 260f),
                     )
                 },
             )
@@ -202,17 +204,18 @@ private fun DrawScope.wheel(
     r: Float,
     on: Color,
 ) {
-    val top = (ROWS - DIGIT_H) / 2f
-    val from = floor(pos).toInt() - 1
-    for (k in from..from + 3) {
+    val top = (VIEW_ROWS - DIGIT_H) / 2f
+    val from = floor(pos).toInt() - 2
+    for (k in from..from + 4) {
         val distance = abs(k - pos)
-        if (distance > 1.7f) continue
-        val alpha = 1f - 0.5f * distance.coerceAtMost(1f)
+        if (distance > 2f) continue
+        // Solo la cifra al centro e' piena: le altre accompagnano, non competono.
+        val alpha = (1f - 0.62f * distance).coerceIn(0f, 1f)
         val grid = DotFont.render("%02d".format(values[k.mod(values.size)]), 1)
         val yTop = (top + (k - pos) * ITEM_H).roundToInt()
         for (y in 0 until DIGIT_H) {
             val row = yTop + y
-            if (row < 0 || row >= ROWS) continue
+            if (row < 0 || row >= VIEW_ROWS) continue
             for (x in grid[y].indices) {
                 if (!grid[y][x]) continue
                 drawCircle(

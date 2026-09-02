@@ -80,29 +80,43 @@ fun WorldClockScreen() {
                 }.getOrNull()
                 Box(Modifier.padding(horizontal = 16.dp)) {
                     Panel {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
+                        Box(Modifier.fillMaxWidth()) {
+                            // Stesso impianto dell'orologio principale, identico per
+                            // ogni citta': ora in dot-matrix e sotto nome e scarto.
+                            Column(
+                                Modifier.fillMaxWidth().padding(top = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                DotText(
+                                    there?.let { Format.clock(it, settings.use24h) } ?: "--:--",
+                                    Modifier.fillMaxWidth().height(60.dp),
+                                    cell = 8.dp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Spacer(Modifier.height(12.dp))
                                 Text(
-                                    Format.zoneCity(zone),
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    Format.zoneCity(zone).uppercase(),
+                                    style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.secondary,
                                 )
+                                Spacer(Modifier.height(4.dp))
                                 Text(
-                                    "${Format.zoneOffset(zone)} · ${Format.zoneRegion(zone)}",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    "${Format.zoneOffset(zone)} · ${Format.zoneRegion(zone)}".uppercase(),
+                                    style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            // Stessa griglia per tutte le citta': l'elenco resta uniforme.
-                            DotText(
-                                there?.let { Format.clock(it, settings.use24h) } ?: "--:--",
-                                Modifier.size(116.dp, 32.dp),
-                                cell = 4.dp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            IconButton(onClick = {
-                                Store.update { s -> s.copy(worldClocks = s.worldClocks - zone) }
-                            }) { Icon(Icons.Outlined.Close, "Rimuovi") }
+                            IconButton(
+                                onClick = { Store.update { s -> s.copy(worldClocks = s.worldClocks - zone) } },
+                                modifier = Modifier.align(Alignment.TopEnd).size(32.dp),
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    "Rimuovi ${Format.zoneCity(zone)}",
+                                    Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }

@@ -19,6 +19,12 @@ object GlyphController {
 
     private const val FPS = 12L
 
+    /** Ogni quanti frame si riafferma il possesso della matrice. */
+    private const val RECLAIM_EVERY = 24
+
+    /** Frame consecutivi rifiutati prima di arrendersi (5 s). */
+    private const val MAX_FAILURES = 60
+
     private var bridge: GlyphBridge? = null
     private var thread: HandlerThread? = null
     private var handler: Handler? = null
@@ -29,6 +35,7 @@ object GlyphController {
     private var label = ""
     private var snoozeUntil = 0L
     private var frame = 0
+    private var failures = 0
 
     private enum class Mode { IDLE, RINGING, SNOOZED }
 
@@ -61,6 +68,7 @@ object GlyphController {
         if (!Store.settings.value.glyphEnabled) return
         mode = m
         frame = 0
+        failures = 0
         if (thread == null) {
             thread = HandlerThread("glyph").also { it.start() }
             handler = Handler(thread!!.looper)
@@ -69,6 +77,8 @@ object GlyphController {
             bridge = runCatching { GlyphBridge(context) { handler?.post(::tick) } }.getOrNull()
             if (bridge == null) stop()
         } else {
+            // removeCallbacks prima di ripartire: mai due cicli di disegno insieme.
+            handler?.removeCallbacksAndMessages(null)
             handler?.post(::tick)
         }
     }
@@ -77,7 +87,22 @@ object GlyphController {
         val b = bridge ?: return
         if (mode == Mode.IDLE) return
         render()
-        runCatching { b.draw(matrix.pixels) }.onFailure { stop(); return }
+
+        if (b.draw(matrix.pixels)) {
+            failures = 0
+            // Il sistema restituisce la matrice al Glyph Toy attivo appena puo':
+            // riaffermare il possesso a intervalli e' l'unico modo per tenerla
+            // mentre la sveglia suona, anche se NoAlarm non e' il toy scelto.
+            if (frame % RECLAIM_EVERY == 0) b.reclaim()
+        } else {
+            failures++
+            b.reclaim()
+            if (failures > MAX_FAILURES) {
+                stop()
+                return
+            }
+        }
+
         frame++
         handler?.postDelayed(::tick, 1000L / FPS)
     }

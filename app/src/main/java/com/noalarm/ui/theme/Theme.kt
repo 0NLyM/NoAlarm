@@ -29,8 +29,8 @@ val Line = Color(0xFF2A2A2A)
 
 // Punti spenti della griglia dot-matrix. Volutamente molto vicini al fondo:
 // devono suggerire il display senza rubare contrasto alle cifre accese.
-val DotOffDark = Color(0xFF121212)
-val DotOffLight = Color(0xFFE9E9E4)
+val DotOffDark = Color(0xFF0D0D0D)
+val DotOffLight = Color(0xFFEFEFEA)
 
 val LocalDotOff = staticCompositionLocalOf { DotOffDark }
 

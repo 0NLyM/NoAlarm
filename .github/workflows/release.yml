@@ -4,6 +4,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Versione da pubblicare (crea il tag se non esiste)"
+        required: true
+        default: "1.0.0"
 
 permissions:
   contents: write
@@ -22,10 +27,25 @@ jobs:
           if [ -z "$KEYSTORE" ]; then
             echo "::error::Manca il segreto NOALARM_KEYSTORE_BASE64."
             echo "Aggiungi in Settings > Secrets and variables > Actions:"
-            echo "  NOALARM_KEYSTORE_BASE64, NOALARM_STORE_PASSWORD, NOALARM_KEY_ALIAS, NOALARM_KEY_PASSWORD"
-            echo "Senza la stessa chiave gli aggiornamenti futuri non si installerebbero sopra questa release."
+            echo "  NOALARM_KEYSTORE_BASE64  (base64 -w0 noalarm-release.jks)"
+            echo "  NOALARM_STORE_PASSWORD"
+            echo "  NOALARM_KEY_ALIAS        (noalarm)"
+            echo "  NOALARM_KEY_PASSWORD"
+            echo "Senza la stessa chiave gli aggiornamenti futuri non si installerebbero"
+            echo "sopra questa release: meglio fermarsi qui che pubblicare un APK inutilizzabile."
             exit 1
           fi
+
+      - name: Determina la versione
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ inputs.version }}"
+          else
+            V="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "tag=v$V" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@v4
         with:
@@ -54,11 +74,12 @@ jobs:
       - name: Verifica la firma
         run: |
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          "$BT/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk
+          "$BT/apksigner" verify --verbose --print-certs \
+            app/build/outputs/apk/release/app-release.apk
 
       - name: Rinomina gli artefatti
         run: |
-          V="${GITHUB_REF_NAME#v}"
+          V="${{ steps.v.outputs.version }}"
           mv app/build/outputs/apk/release/app-release.apk "NoAlarm-$V.apk"
           mv app/build/outputs/bundle/release/app-release.aab "NoAlarm-$V.aab"
 
@@ -68,6 +89,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          name: NoAlarm ${{ steps.v.outputs.version }}
           files: |
             NoAlarm-*.apk
             NoAlarm-*.aab

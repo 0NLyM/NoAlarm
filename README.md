@@ -69,8 +69,9 @@ cp keystore.properties.template keystore.properties
 ### Su GitHub Actions
 
 Il workflow [`release.yml`](.github/workflows/release.yml) firma e pubblica una
-release a ogni tag `v*`. Servono quattro segreti in
-*Settings → Secrets and variables → Actions*:
+release a ogni tag `v*`, oppure su richiesta da *Actions → Release → Run
+workflow* indicando la versione (il tag viene creato se non esiste).
+Servono quattro segreti in *Settings → Secrets and variables → Actions*:
 
 | Segreto | Contenuto |
 |---|---|
@@ -79,7 +80,9 @@ release a ogni tag `v*`. Servono quattro segreti in
 | `NOALARM_KEY_ALIAS` | `noalarm` |
 | `NOALARM_KEY_PASSWORD` | password della chiave (uguale a quella del keystore) |
 
-Il workflow verifica la firma con `apksigner` e allega APK e AAB alla release.
+Il workflow si ferma subito se i segreti mancano: meglio nessuna release che una
+firmata con una chiave diversa, che poi non si potrebbe piu' aggiornare. Quando ci
+sono, verifica la firma con `apksigner` e allega APK e AAB alla release.
 
 **Non perdere il keystore.** Senza, l'unico modo per aggiornare l'app è
 disinstallarla e reinstallarla da zero, perdendo sveglie e impostazioni.

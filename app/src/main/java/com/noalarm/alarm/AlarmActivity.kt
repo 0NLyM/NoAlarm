@@ -22,6 +22,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AlarmOff
+import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.Snooze
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,7 +47,7 @@ import com.noalarm.data.Alarm
 import com.noalarm.data.KeyAction
 import com.noalarm.data.Store
 import com.noalarm.ui.DotText
-import com.noalarm.ui.DotButton
+import com.noalarm.ui.DotIconButton
 import com.noalarm.ui.rememberNow
 import com.noalarm.ui.theme.NoAlarmTheme
 import java.time.Instant
@@ -134,7 +139,7 @@ private fun Ringing(
         label = "pulse",
     )
     val time = ZonedDateTime.ofInstant(Instant.ofEpochMilli(now), ZoneId.systemDefault())
-    val outOfSnoozes = settings.snoozeLimit > 0 && snoozes >= settings.snoozeLimit
+    val outOfSnoozes = alarm.snoozeLimit > 0 && snoozes >= alarm.snoozeLimit
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -178,12 +183,12 @@ private fun Ringing(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
-                    DotButton(
-                        "-", size = 56,
-                        enabled = !outOfSnoozes && minutes > settings.snoozeMinMinutes,
+                    DotIconButton(
+                        Icons.Outlined.Remove, "Rinvia di meno", size = 56,
+                        enabled = !outOfSnoozes && minutes > alarm.snoozeMinMinutes,
                         onClick = {
-                            minutes = (minutes - settings.snoozeStepMinutes)
-                                .coerceAtLeast(settings.snoozeMinMinutes)
+                            minutes = (minutes - alarm.snoozeStepMinutes)
+                                .coerceAtLeast(alarm.snoozeMinMinutes)
                             onSnoozeChange(minutes)
                         },
                     )
@@ -197,12 +202,12 @@ private fun Ringing(
                         Text("MIN", style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    DotButton(
-                        "+", size = 56,
-                        enabled = !outOfSnoozes && minutes < settings.snoozeMaxMinutes,
+                    DotIconButton(
+                        Icons.Outlined.Add, "Rinvia di piu'", size = 56,
+                        enabled = !outOfSnoozes && minutes < alarm.snoozeMaxMinutes,
                         onClick = {
-                            minutes = (minutes + settings.snoozeStepMinutes)
-                                .coerceAtMost(settings.snoozeMaxMinutes)
+                            minutes = (minutes + alarm.snoozeStepMinutes)
+                                .coerceAtMost(alarm.snoozeMaxMinutes)
                             onSnoozeChange(minutes)
                         },
                     )
@@ -222,14 +227,16 @@ private fun Ringing(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DotButton(
-                    "Posticipa",
+                DotIconButton(
+                    Icons.Outlined.Snooze,
+                    "Posticipa di $minutes minuti",
                     onClick = { onSnooze(minutes) },
                     size = 104,
                     enabled = !outOfSnoozes,
                 )
-                DotButton(
-                    "Spegni",
+                DotIconButton(
+                    Icons.Outlined.AlarmOff,
+                    "Spegni la sveglia",
                     onClick = onDismiss,
                     size = 104,
                     color = MaterialTheme.colorScheme.secondary,

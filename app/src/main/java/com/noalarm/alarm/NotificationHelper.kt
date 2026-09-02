@@ -149,7 +149,7 @@ object NotificationHelper {
             .setSmallIcon(R.drawable.ic_stat_alarm)
             .setContentTitle("Ora di andare a letto")
             .setContentText("Fra $minutes minuti, per svegliarti riposato.")
-            .setContentIntent(open(c, MainActivity.TAB_BEDTIME))
+            .setContentIntent(open(c, MainActivity.TAB_ALARM))
             .setAutoCancel(true)
             .build()
         runCatching { NotificationManagerCompat.from(c).notify(ID_BEDTIME, n) }

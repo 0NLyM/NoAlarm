@@ -15,6 +15,10 @@ data class Alarm(
     val enabled: Boolean = true,
     /** ISO: 1 = lunedi' ... 7 = domenica. Vuoto = sveglia singola. */
     val days: Set<Int> = emptySet(),
+    /** > 0: suona una volta sola in questa data (epoch day). Ha la precedenza su [days]. */
+    val dateEpochDay: Long = 0L,
+    /** Date (epoch day) in cui questa sveglia non deve suonare. */
+    val skipDates: Set<Long> = emptySet(),
     val label: String = "",
     /** null = suoneria sveglia di sistema. */
     val soundUri: String? = null,
@@ -23,33 +27,66 @@ data class Alarm(
     val snoozeMinutes: Int = 10,
     /** 0 = non silenziare mai. */
     val autoSilenceMinutes: Int = 10,
+    // Regolazione del rinvio con i pulsanti +/- mentre suona: per singola sveglia.
+    val snoozeStepMinutes: Int = 1,
+    val snoozeMinMinutes: Int = 1,
+    val snoozeMaxMinutes: Int = 60,
+    /** 0 = rinvii illimitati. */
+    val snoozeLimit: Int = 0,
     val glyph: Boolean = true,
     /** Salta la prossima occorrenza (equivalente di "Ignora sveglia" di Google Clock). */
     val skipNext: Boolean = false,
     /** > 0 quando la sveglia e' posticipata: istante del prossimo squillo. */
     val snoozedUntil: Long = 0L,
 ) {
-    val repeating get() = days.isNotEmpty()
+    val repeating get() = days.isNotEmpty() && dateEpochDay == 0L
+    val onDate get() = dateEpochDay > 0L
+    val date: LocalDate? get() = if (onDate) LocalDate.ofEpochDay(dateEpochDay) else null
 
     /** Prossimo istante di squillo in millis, o null se non ne ha uno. */
     fun nextTrigger(now: LocalDateTime = LocalDateTime.now(), zone: ZoneId = ZoneId.systemDefault()): Long? {
         if (!enabled) return null
         if (snoozedUntil > 0) return snoozedUntil
         val time = LocalTime.of(hour, minute)
-        var date: LocalDate = if (now.toLocalTime() < time) now.toLocalDate() else now.toLocalDate().plusDays(1)
-        if (days.isEmpty()) {
-            if (skipNext) date = date.plusDays(1)
-            return date.atTime(time).atZone(zone).toInstant().toEpochMilli()
+        val from = if (now.toLocalTime() < time) now.toLocalDate() else now.toLocalDate().plusDays(1)
+
+        if (onDate) {
+            val d = LocalDate.ofEpochDay(dateEpochDay)
+            if (d < from || d.toEpochDay() in skipDates) return null
+            return d.atTime(time).atZone(zone).toInstant().toEpochMilli()
         }
-        var skipped = !skipNext
-        for (i in 0..14) {
-            val d = date.plusDays(i.toLong())
-            if (d.dayOfWeek.value in days) {
-                if (skipped) return d.atTime(time).atZone(zone).toInstant().toEpochMilli()
-                skipped = true
+
+        var toSkip = if (skipNext) 1 else 0
+        // Un anno di margine: oltre, la ripetizione non esiste.
+        for (i in 0..370L) {
+            val d = from.plusDays(i)
+            if (days.isNotEmpty() && d.dayOfWeek.value !in days) continue
+            if (d.toEpochDay() in skipDates) continue
+            if (toSkip > 0) {
+                toSkip--
+                continue
             }
+            return d.atTime(time).atZone(zone).toInstant().toEpochMilli()
         }
         return null
+    }
+
+    /**
+     * Se questa sveglia e' prevista in [date]. Serve al calendario, che proietta
+     * le ripetizioni sui giorni del mese.
+     */
+    fun firesOn(date: LocalDate, zone: ZoneId = ZoneId.systemDefault()): Boolean {
+        if (!enabled || date.toEpochDay() in skipDates) return false
+        if (onDate) return date.toEpochDay() == dateEpochDay
+        if (days.isNotEmpty()) {
+            if (date.dayOfWeek.value !in days) return false
+            // Una ripetizione non vale per i giorni gia' passati.
+            val next = nextTrigger(zone = zone) ?: return false
+            return !date.isBefore(java.time.Instant.ofEpochMilli(next).atZone(zone).toLocalDate())
+        }
+        // Sveglia singola senza data: cade solo nel giorno del prossimo squillo.
+        val next = nextTrigger(zone = zone) ?: return false
+        return date == java.time.Instant.ofEpochMilli(next).atZone(zone).toLocalDate()
     }
 }
 
@@ -82,11 +119,6 @@ data class Settings(
     val shakeAction: KeyAction = KeyAction.NONE,
     val glyphEnabled: Boolean = true,
     val glyphToyClock: Boolean = true,
-    /** Passo dei pulsanti +/- che regolano il rinvio mentre la sveglia suona (stile Samsung). */
-    val snoozeStepMinutes: Int = 1,
-    val snoozeMinMinutes: Int = 1,
-    val snoozeMaxMinutes: Int = 60,
-    val snoozeLimit: Int = 0, // 0 = illimitato
     val timerSoundUri: String? = null,
     val worldClocks: List<String> = emptyList(),
     val homeZone: String = "",

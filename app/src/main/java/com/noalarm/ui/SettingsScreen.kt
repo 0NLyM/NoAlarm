@@ -57,20 +57,13 @@ fun SettingsScreen() {
             if (s.defaultAutoSilenceMinutes == 0) "Mai" else "${s.defaultAutoSilenceMinutes} min",
             0, 60, s.defaultAutoSilenceMinutes,
         ) { v -> Store.update { it.copy(defaultAutoSilenceMinutes = v) } }
-        StepperRow("Limite rinvii", if (s.snoozeLimit == 0) "Illimitati" else "${s.snoozeLimit}", 0, 10, s.snoozeLimit) { v ->
-            Store.update { it.copy(snoozeLimit = v) }
-        }
-
-        SectionLabel("Rinvio regolabile mentre suona")
-        StepperRow("Passo dei pulsanti", "${s.snoozeStepMinutes} min", 1, 15, s.snoozeStepMinutes) { v ->
-            Store.update { it.copy(snoozeStepMinutes = v) }
-        }
-        StepperRow("Minimo", "${s.snoozeMinMinutes} min", 1, 30, s.snoozeMinMinutes) { v ->
-            Store.update { it.copy(snoozeMinMinutes = v, snoozeMaxMinutes = maxOf(v, it.snoozeMaxMinutes)) }
-        }
-        StepperRow("Massimo", "${s.snoozeMaxMinutes} min", 1, 120, s.snoozeMaxMinutes) { v ->
-            Store.update { it.copy(snoozeMaxMinutes = maxOf(v, it.snoozeMinMinutes)) }
-        }
+        Text(
+            "Valgono per le sveglie nuove. Rinvio, passo dei pulsanti, minimo, massimo e "
+                + "numero di rinvii si regolano dentro ogni singola sveglia.",
+            Modifier.padding(horizontal = 4.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         SectionLabel("Comandi mentre suona")
         CycleRow("Tasti volume", s.volumeKeyAction, KeyAction.entries.toList()) { v ->

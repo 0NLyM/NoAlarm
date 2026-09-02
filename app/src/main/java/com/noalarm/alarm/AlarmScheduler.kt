@@ -57,6 +57,19 @@ object AlarmScheduler {
 
     fun cancel(c: Context, id: Long) = manager(c).cancel(pending(c, id, ACTION_RING))
 
+    /** Salva la sveglia, la riprogramma e aggiorna la notifica di imminenza. */
+    fun save(c: Context, alarm: Alarm) {
+        Store.putAlarm(alarm)
+        schedule(c, alarm)
+        NotificationHelper.showUpcoming(c, next())
+    }
+
+    fun delete(c: Context, id: Long) {
+        cancel(c, id)
+        Store.removeAlarm(id)
+        NotificationHelper.showUpcoming(c, next())
+    }
+
     /** La prossima sveglia che suonera', con il suo istante. */
     fun next(): Pair<Alarm, Long>? = Store.alarms.value
         .mapNotNull { a -> a.nextTrigger()?.let { a to it } }

@@ -101,6 +101,11 @@ object Store {
         return (0 until a.length()).map { a.getInt(it) }.toSet()
     }
 
+    private fun longs(o: JSONObject, key: String): Set<Long> {
+        val a = o.optJSONArray(key) ?: return emptySet()
+        return (0 until a.length()).map { a.getLong(it) }.toSet()
+    }
+
     private fun strings(o: JSONObject, key: String): List<String> {
         val a = o.optJSONArray(key) ?: return emptyList()
         return (0 until a.length()).map { a.getString(it) }
@@ -109,9 +114,13 @@ object Store {
     private fun json(a: Alarm) = JSONObject().apply {
         put("id", a.id); put("hour", a.hour); put("minute", a.minute)
         put("enabled", a.enabled); put("days", JSONArray(a.days.toList()))
+        put("dateEpochDay", a.dateEpochDay); put("skipDates", JSONArray(a.skipDates.toList()))
         put("label", a.label); put("soundUri", a.soundUri ?: JSONObject.NULL)
         put("vibrate", a.vibrate); put("gradualVolume", a.gradualVolume)
         put("snoozeMinutes", a.snoozeMinutes); put("autoSilenceMinutes", a.autoSilenceMinutes)
+        put("snoozeStepMinutes", a.snoozeStepMinutes)
+        put("snoozeMinMinutes", a.snoozeMinMinutes); put("snoozeMaxMinutes", a.snoozeMaxMinutes)
+        put("snoozeLimit", a.snoozeLimit)
         put("glyph", a.glyph); put("skipNext", a.skipNext); put("snoozedUntil", a.snoozedUntil)
     }
 
@@ -119,12 +128,17 @@ object Store {
         id = o.getLong("id"),
         hour = o.optInt("hour"), minute = o.optInt("minute"),
         enabled = o.optBoolean("enabled", true), days = ints(o, "days"),
+        dateEpochDay = o.optLong("dateEpochDay", 0L), skipDates = longs(o, "skipDates"),
         label = o.optString("label", ""),
         soundUri = if (o.isNull("soundUri")) null else o.optString("soundUri"),
         vibrate = o.optBoolean("vibrate", true),
         gradualVolume = o.optBoolean("gradualVolume", true),
         snoozeMinutes = o.optInt("snoozeMinutes", 10),
         autoSilenceMinutes = o.optInt("autoSilenceMinutes", 10),
+        snoozeStepMinutes = o.optInt("snoozeStepMinutes", 1),
+        snoozeMinMinutes = o.optInt("snoozeMinMinutes", 1),
+        snoozeMaxMinutes = o.optInt("snoozeMaxMinutes", 60),
+        snoozeLimit = o.optInt("snoozeLimit", 0),
         glyph = o.optBoolean("glyph", true),
         skipNext = o.optBoolean("skipNext", false),
         snoozedUntil = o.optLong("snoozedUntil", 0L),
@@ -165,9 +179,6 @@ object Store {
         put("volumeKeyAction", s.volumeKeyAction.name); put("powerKeyAction", s.powerKeyAction.name)
         put("flipAction", s.flipAction.name); put("shakeAction", s.shakeAction.name)
         put("glyphEnabled", s.glyphEnabled); put("glyphToyClock", s.glyphToyClock)
-        put("snoozeStepMinutes", s.snoozeStepMinutes)
-        put("snoozeMinMinutes", s.snoozeMinMinutes); put("snoozeMaxMinutes", s.snoozeMaxMinutes)
-        put("snoozeLimit", s.snoozeLimit)
         put("timerSoundUri", s.timerSoundUri ?: JSONObject.NULL)
         put("worldClocks", JSONArray(s.worldClocks)); put("homeZone", s.homeZone)
         put("bedtimeEnabled", s.bedtimeEnabled)
@@ -192,10 +203,6 @@ object Store {
         shakeAction = key(o, "shakeAction", KeyAction.NONE),
         glyphEnabled = o.optBoolean("glyphEnabled", true),
         glyphToyClock = o.optBoolean("glyphToyClock", true),
-        snoozeStepMinutes = o.optInt("snoozeStepMinutes", 1),
-        snoozeMinMinutes = o.optInt("snoozeMinMinutes", 1),
-        snoozeMaxMinutes = o.optInt("snoozeMaxMinutes", 60),
-        snoozeLimit = o.optInt("snoozeLimit", 0),
         timerSoundUri = if (o.isNull("timerSoundUri")) null else o.optString("timerSoundUri"),
         worldClocks = strings(o, "worldClocks"),
         homeZone = o.optString("homeZone", ""),

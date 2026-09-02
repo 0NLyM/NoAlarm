@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,6 +91,36 @@ fun DotButton(
         color = if (enabled) contentColor else contentColor.copy(alpha = 0.4f),
         textAlign = TextAlign.Center,
         fontSize = if (label.length > 6) 10.sp else 12.sp,
+    )
+}
+
+/**
+ * Il fratello di [DotButton] con un'icona al posto del testo: nell'app le
+ * etichette di una sola parola sono sostituite dal simbolo corrispondente.
+ */
+@Composable
+fun DotIconButton(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Int = 72,
+    color: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    enabled: Boolean = true,
+) = Box(
+    modifier
+        .size(size.dp)
+        .clip(CircleShape)
+        .background(if (enabled) color else color.copy(alpha = 0.4f))
+        .clickable(enabled = enabled, onClick = onClick),
+    contentAlignment = Alignment.Center,
+) {
+    Icon(
+        icon,
+        description,
+        Modifier.size((size * 0.42f).dp),
+        tint = if (enabled) contentColor else contentColor.copy(alpha = 0.4f),
     )
 }
 

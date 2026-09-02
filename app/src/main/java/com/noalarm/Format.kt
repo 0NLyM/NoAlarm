@@ -2,6 +2,8 @@ package com.noalarm
 
 import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -97,6 +99,19 @@ object Format {
             else -> dayLabel(date.dayOfWeek)
         }
     }
+
+    /** "Sab 14 mar" */
+    fun dateLabel(d: LocalDate): String =
+        "%s %d %s".format(
+            dayLabel(d.dayOfWeek),
+            d.dayOfMonth,
+            d.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()).trimEnd('.'),
+        )
+
+    /** "Marzo 2026" */
+    fun monthLabel(m: YearMonth): String =
+        m.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+            .replaceFirstChar { it.uppercase() } + " " + m.year
 
     fun midnightMs(t: LocalTime): Long = t.toSecondOfDay() * 1000L
 }

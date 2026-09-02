@@ -10,6 +10,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,21 +46,22 @@ fun StopwatchScreen() {
         )
         Spacer(Modifier.height(32.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            DotButton(
-                "Reset",
+            DotIconButton(
+                Icons.Outlined.Refresh, "Azzera",
                 { ClockService.stopwatchReset(context) },
                 size = 64,
                 enabled = elapsed > 0,
             )
-            DotButton(
-                if (sw.running) "Pausa" else if (elapsed > 0) "Riprendi" else "Avvia",
+            DotIconButton(
+                if (sw.running) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                if (sw.running) "Metti in pausa" else if (elapsed > 0) "Riprendi" else "Avvia",
                 { ClockService.stopwatchToggle(context) },
                 size = 88,
                 color = MaterialTheme.colorScheme.secondary,
                 contentColor = MaterialTheme.colorScheme.onSecondary,
             )
-            DotButton(
-                "Giro",
+            DotIconButton(
+                Icons.Outlined.Flag, "Registra un giro",
                 { ClockService.stopwatchLap(context) },
                 size = 64,
                 enabled = sw.running,

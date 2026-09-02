@@ -11,6 +11,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Backspace
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.MoreTime
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -67,7 +75,7 @@ fun TimerScreen() {
             item {
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    DotButton("Nuovo", { adding = true })
+                    DotIconButton(Icons.Outlined.Add, "Nuovo timer", { adding = true })
                 }
             }
         }
@@ -107,15 +115,19 @@ private fun TimerCard(t: TimerItem, now: Long) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DotButton("+1 min", { ClockService.timerAdd(context, t.id, 1) }, size = 56)
-                DotButton(
-                    if (t.running) "Pausa" else "Avvia",
+                DotIconButton(
+                    Icons.Outlined.MoreTime, "Aggiungi un minuto",
+                    { ClockService.timerAdd(context, t.id, 1) }, size = 56,
+                )
+                DotIconButton(
+                    if (t.running) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                    if (t.running) "Metti in pausa" else "Avvia",
                     { ClockService.timerToggle(context, t.id) },
                     size = 56,
                     enabled = !t.expired,
                 )
-                DotButton(
-                    "Elimina",
+                DotIconButton(
+                    Icons.Outlined.Delete, "Elimina il timer",
                     { Store.removeTimer(t.id); ClockService.sync(context) },
                     size = 56,
                     color = MaterialTheme.colorScheme.secondary,
@@ -167,13 +179,14 @@ private fun Keypad(
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             DotButton("00", { onDigit('0'); onDigit('0') })
             DotButton("0", { onDigit('0') })
-            DotButton("<", onBack, enabled = digits.isNotEmpty())
+            DotIconButton(Icons.Outlined.Backspace, "Cancella l'ultima cifra", onBack, enabled = digits.isNotEmpty())
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (onCancel != null) DotButton("Annulla", onCancel, size = 64)
-        DotButton(
-            "Avvia",
+        if (onCancel != null) DotIconButton(Icons.Outlined.Close, "Annulla", onCancel, size = 64)
+        DotIconButton(
+            Icons.Outlined.PlayArrow,
+            "Avvia il timer",
             onStart,
             size = 88,
             color = MaterialTheme.colorScheme.secondary,

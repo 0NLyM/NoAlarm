@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Alarm
-import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Settings
@@ -41,7 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.noalarm.data.Store
 import com.noalarm.ui.AlarmScreen
-import com.noalarm.ui.BedtimeScreen
+import com.noalarm.ui.CalendarScreen
 import com.noalarm.ui.SettingsScreen
 import com.noalarm.ui.StopwatchScreen
 import com.noalarm.ui.TimerScreen
@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
         const val TAB_CLOCK = "clock"
         const val TAB_TIMER = "timer"
         const val TAB_STOPWATCH = "stopwatch"
-        const val TAB_BEDTIME = "bedtime"
+        const val TAB_CALENDAR = "calendar"
     }
 }
 
@@ -99,7 +99,7 @@ private val tabs = listOf(
     Tab(MainActivity.TAB_CLOCK, "Orologio", Icons.Outlined.Public),
     Tab(MainActivity.TAB_TIMER, "Timer", Icons.Outlined.HourglassEmpty),
     Tab(MainActivity.TAB_STOPWATCH, "Cronometro", Icons.Outlined.Timer),
-    Tab(MainActivity.TAB_BEDTIME, "Riposo", Icons.Outlined.Bedtime),
+    Tab(MainActivity.TAB_CALENDAR, "Calendario", Icons.Outlined.CalendarMonth),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -137,7 +137,6 @@ private fun Home(requestedTab: String?, onTabConsumed: () -> Unit) {
                         selected = !settings && t.key == current,
                         onClick = { current = t.key; settings = false },
                         icon = { Icon(t.icon, t.title) },
-                        label = { Text(t.title.uppercase(), style = MaterialTheme.typography.labelMedium) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.onSecondary,
                             indicatorColor = MaterialTheme.colorScheme.secondary,
@@ -156,7 +155,7 @@ private fun Home(requestedTab: String?, onTabConsumed: () -> Unit) {
                 current == MainActivity.TAB_CLOCK -> WorldClockScreen()
                 current == MainActivity.TAB_TIMER -> TimerScreen()
                 current == MainActivity.TAB_STOPWATCH -> StopwatchScreen()
-                else -> BedtimeScreen()
+                else -> CalendarScreen()
             }
         }
     }

@@ -11,17 +11,24 @@ finisce sulla **Glyph Matrix** del Nothing Phone (3) mentre la sveglia suona.
 | | |
 |---|---|
 | Sveglia | ripetizione per giorni, etichetta, suoneria di sistema, vibrazione, volume crescente, rinvio e silenziamento automatico configurabili, "ignora una volta", ripristino dopo il riavvio, notifica della sveglia imminente e di quella non udita |
+| Calendario | vista mensile con un punto per ogni sveglia prevista, sveglie legate a una data singola, salto di una sola occorrenza |
 | Orologio | ora locale a caratteri dot-matrix, fusi orari del mondo con scarto rispetto a casa |
 | Timer | tastierino HH:MM:SS, timer multipli, pausa/riprendi, +1 minuto, notifica persistente e suoneria a scadenza |
 | Cronometro | giri con delta, notifica persistente, sopravvive alla chiusura dell'app |
-| Riposo | ora di andare a letto e di sveglia, giorni, promemoria anticipato |
+| Riposo | ora di andare a letto e di sveglia, giorni, promemoria anticipato; si apre dalla riga fissa in cima all'elenco delle sveglie, come in Google Clock |
 
 **In più**
 
 - **Rinvio regolabile mentre suona.** I pulsanti `−` e `+` sulla schermata della
   sveglia cambiano i minuti di rinvio *prima* di posticipare, come su Samsung.
-  Passo, minimo, massimo e numero di rinvii consentiti si impostano nelle
-  impostazioni.
+  Passo, minimo, massimo e numero di rinvii consentiti si regolano **dentro ogni
+  singola sveglia**: quella del lavoro e quella del weekend possono comportarsi
+  in modo diverso.
+- **Selettore dell'orario a rulli dot-matrix.** Due colonne di cifre disegnate a
+  punti che scorrono con lo snap e un ritorno aptico: la cifra al centro e'
+  piena, quelle sopra e sotto rimpiccioliscono e sfumano nei punti spenti.
+- **Pulsanti a sola icona.** Dove il testo era una parola sola c'e' un simbolo,
+  barra di navigazione compresa; le descrizioni restano per l'accessibilita'.
 - **Glyph Matrix (Nothing Phone 3).** Mentre la sveglia suona la matrice 25×25 sul
   retro mostra l'ora corrente in dot-matrix con i due punti che lampeggiano al
   secondo, alternata a una campanella pulsante e all'etichetta a scorrimento.

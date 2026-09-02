@@ -3,6 +3,7 @@ package com.noalarm.glyph
 import android.content.Context
 import android.os.Handler
 import android.os.HandlerThread
+import com.noalarm.data.GlyphStyle
 import com.noalarm.data.Store
 import com.noalarm.ui.DotFont
 import java.time.ZoneId
@@ -24,6 +25,7 @@ object GlyphController {
     private val matrix = Matrix()
 
     private var mode = Mode.IDLE
+    private var style = GlyphStyle.CYCLE
     private var label = ""
     private var snoozeUntil = 0L
     private var frame = 0
@@ -31,8 +33,10 @@ object GlyphController {
     private enum class Mode { IDLE, RINGING, SNOOZED }
 
     @Synchronized
-    fun ring(context: Context, label: String) {
+    fun ring(context: Context, label: String, style: GlyphStyle = GlyphStyle.CYCLE) {
         this.label = label.uppercase().filter(::printable)
+        // Senza etichetta lo stile "etichetta" non avrebbe niente da mostrare.
+        this.style = if (style == GlyphStyle.LABEL && this.label.isBlank()) GlyphStyle.CLOCK else style
         start(context, Mode.RINGING)
     }
 
@@ -89,23 +93,46 @@ object GlyphController {
             matrix.textCentered("MIN", 18, 70)
             return
         }
-        // Ciclo di 4 s: 3 s di orologio, 1 s di campanella (con etichetta).
-        if ((frame / FPS.toInt()) % 4 == 3) {
-            val pulse = (60 + abs((frame % 12) - 6) * 32).coerceAtMost(255)
-            matrix.bitmapCentered(Matrix.BELL, 2, pulse)
-            if (label.isNotEmpty()) {
-                val span = DotFont.width(label) + Matrix.SIZE
-                matrix.text(label, Matrix.SIZE - (frame * 2 % span), 17, 120)
-            }
-        } else {
-            val h = if (s.use24h) now.hour else (now.hour % 12).let { if (it == 0) 12 else it }
-            matrix.textCentered("%02d".format(h), 3)
-            matrix.textCentered("%02d".format(now.minute), 15)
-            if (now.second % 2 == 0) {          // i due punti lampeggiano al secondo
-                matrix.set(12, 11, 200)
-                matrix.set(12, 13, 200)
-            }
+        when (style) {
+            GlyphStyle.CLOCK -> clock(now, s.use24h)
+            GlyphStyle.BELL -> bell()
+            GlyphStyle.LABEL -> scrollingLabel()
+            GlyphStyle.COUNTDOWN -> countdownToNext()
+            // Ciclo di 4 s: 3 s di orologio, 1 s di campanella con l'etichetta.
+            GlyphStyle.CYCLE -> if ((frame / FPS.toInt()) % 4 == 3) {
+                bell()
+                scrollingLabel()
+            } else clock(now, s.use24h)
         }
+    }
+
+    private fun clock(now: ZonedDateTime, use24h: Boolean) {
+        val h = if (use24h) now.hour else (now.hour % 12).let { if (it == 0) 12 else it }
+        matrix.textCentered("%02d".format(h), 3)
+        matrix.textCentered("%02d".format(now.minute), 15)
+        if (now.second % 2 == 0) {              // i due punti lampeggiano al secondo
+            matrix.set(12, 11, 200)
+            matrix.set(12, 13, 200)
+        }
+    }
+
+    private fun bell() {
+        val pulse = (60 + abs((frame % 12) - 6) * 32).coerceAtMost(255)
+        matrix.bitmapCentered(Matrix.BELL, 2, pulse)
+    }
+
+    private fun scrollingLabel() {
+        if (label.isEmpty()) return
+        val span = DotFont.width(label) + Matrix.SIZE
+        matrix.text(label, Matrix.SIZE - (frame * 2 % span), 17, 120)
+    }
+
+    /** Da quanto sta suonando: utile per capire a colpo d'occhio se e' in ritardo. */
+    private fun countdownToNext() {
+        val seconds = frame / FPS.toInt()
+        matrix.textCentered("SUONA", 2, 90)
+        matrix.textCentered("%02d".format(seconds / 60), 10)
+        matrix.textCentered("%02d".format(seconds % 60), 18, 140)
     }
 
     private fun printable(c: Char) = c.isLetterOrDigit() || c == ' ' || c == ':' || c == '-'

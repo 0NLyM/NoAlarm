@@ -54,7 +54,10 @@ fun WorldClockScreen() {
         ) {
             item {
                 val here = ZonedDateTime.ofInstant(Instant.ofEpochMilli(now), ZoneId.systemDefault())
-                Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     DotText(
                         Format.clock(here, settings.use24h, settings.showSeconds),
                         Modifier.fillMaxWidth().height(90.dp),
@@ -67,6 +70,7 @@ fun WorldClockScreen() {
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Spacer(Modifier.height(16.dp))
                 }
             }
 
@@ -75,23 +79,32 @@ fun WorldClockScreen() {
                     ZonedDateTime.ofInstant(Instant.ofEpochMilli(now), ZoneId.of(zone))
                 }.getOrNull()
                 Box(Modifier.padding(horizontal = 16.dp)) {
-                    RowItem(
-                        title = Format.zoneCity(zone),
-                        subtitle = "${Format.zoneOffset(zone)} · ${Format.zoneRegion(zone)}",
-                        trailing = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                DotText(
-                                    there?.let { Format.clock(it, settings.use24h) } ?: "--:--",
-                                    Modifier.size(104.dp, 28.dp),
-                                    cell = 3.5.dp,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                    Panel {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    Format.zoneCity(zone),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.secondary,
                                 )
-                                IconButton(onClick = {
-                                    Store.update { s -> s.copy(worldClocks = s.worldClocks - zone) }
-                                }) { Icon(Icons.Outlined.Close, "Rimuovi") }
+                                Text(
+                                    "${Format.zoneOffset(zone)} · ${Format.zoneRegion(zone)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
-                        },
-                    )
+                            // Stessa griglia per tutte le citta': l'elenco resta uniforme.
+                            DotText(
+                                there?.let { Format.clock(it, settings.use24h) } ?: "--:--",
+                                Modifier.size(116.dp, 32.dp),
+                                cell = 4.dp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            IconButton(onClick = {
+                                Store.update { s -> s.copy(worldClocks = s.worldClocks - zone) }
+                            }) { Icon(Icons.Outlined.Close, "Rimuovi") }
+                        }
+                    }
                 }
             }
         }

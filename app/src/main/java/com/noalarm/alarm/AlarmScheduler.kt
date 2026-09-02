@@ -33,8 +33,19 @@ object AlarmScheduler {
     fun canScheduleExact(c: Context): Boolean =
         Build.VERSION.SDK_INT < 31 || manager(c).canScheduleExactAlarms()
 
+    /**
+     * Spegne le sveglie che non suoneranno piu': una data singola ormai passata,
+     * o una ripetizione le cui occorrenze sono state tutte saltate.
+     */
+    fun pruneExpired(c: Context) {
+        Store.alarms.value
+            .filter { it.enabled && it.snoozedUntil == 0L && it.nextTrigger() == null }
+            .forEach { save(c, it.copy(enabled = false, skipNext = false)) }
+    }
+
     /** Riallinea tutte le sveglie di sistema allo stato dello Store. */
     fun syncAll(c: Context) {
+        pruneExpired(c)
         Store.alarms.value.forEach { schedule(c, it) }
         scheduleBedtime(c)
         NotificationHelper.showUpcoming(c, next())

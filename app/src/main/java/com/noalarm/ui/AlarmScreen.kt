@@ -41,6 +41,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.noalarm.Format
 import com.noalarm.alarm.AlarmScheduler
 import com.noalarm.data.Alarm
+import com.noalarm.data.GlyphStyle
 import com.noalarm.data.Store
 import java.time.DayOfWeek
 import java.time.Duration
@@ -65,7 +67,10 @@ fun AlarmScreen() {
     val settings by Store.settings.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Alarm?>(null) }
     var bedtime by remember { mutableStateOf(false) }
-    rememberNow(30_000L)
+    val tick = rememberNow(30_000L)
+
+    // Una sveglia a data singola gia' passata non ha piu' senso: si spegne da sola.
+    LaunchedEffect(tick) { AlarmScheduler.pruneExpired(context) }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -175,35 +180,36 @@ private fun BedtimeRow(onClick: () -> Unit) {
     Panel(onClick = onClick) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
+                // Stessa misura e stesso riquadro di AlarmRow: le due ore si allineano.
+                DotText(
+                    Format.hhmm(s.wakeHour, s.wakeMinute, s.use24h),
+                    Modifier.height(40.dp).fillMaxWidth(0.75f),
+                    cell = 5.dp,
+                    color = if (s.bedtimeEnabled) MaterialTheme.colorScheme.onSurface
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Outlined.Bedtime,
                         "Routine del sonno",
-                        Modifier.size(18.dp),
+                        Modifier.size(14.dp),
                         tint = if (s.bedtimeEnabled) MaterialTheme.colorScheme.secondary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.width(10.dp))
-                    DotText(
-                        Format.hhmm(s.wakeHour, s.wakeMinute, s.use24h),
-                        Modifier.height(40.dp).width(150.dp),
-                        cell = 5.dp,
-                        color = if (s.bedtimeEnabled) MaterialTheme.colorScheme.onSurface
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (s.bedtimeEnabled)
+                            "A letto %s · %dh%02d · %s".format(
+                                Format.hhmm(s.bedtimeHour, s.bedtimeMinute, s.use24h),
+                                sleep.toHours(), sleep.toMinutes() % 60,
+                                Format.daysLabel(s.bedtimeDays, s.dayOrder()),
+                            )
+                        else "Routine del sonno disattivata",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    if (s.bedtimeEnabled)
-                        "A letto %s · %dh%02d · %s".format(
-                            Format.hhmm(s.bedtimeHour, s.bedtimeMinute, s.use24h),
-                            sleep.toHours(), sleep.toMinutes() % 60,
-                            Format.daysLabel(s.bedtimeDays, s.dayOrder()),
-                        )
-                    else "Routine del sonno disattivata",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
             Switch(
                 checked = s.bedtimeEnabled,
@@ -391,6 +397,17 @@ private fun AlarmEditor(
             SwitchRow("Vibrazione", draft.vibrate) { draft = draft.copy(vibrate = it) }
             SwitchRow("Volume crescente", draft.gradualVolume) { draft = draft.copy(gradualVolume = it) }
             SwitchRow("Glyph Matrix mentre suona", draft.glyph) { draft = draft.copy(glyph = it) }
+            if (draft.glyph) {
+                val styles = GlyphStyle.entries
+                RowItem(
+                    title = "Cosa mostra la matrice",
+                    subtitle = glyphStyleLabel(draft.glyphStyle),
+                    onClick = {
+                        val next = styles[(styles.indexOf(draft.glyphStyle) + 1).mod(styles.size)]
+                        draft = draft.copy(glyphStyle = next)
+                    },
+                )
+            }
             StepperRow(
                 "Silenzia dopo",
                 if (draft.autoSilenceMinutes == 0) "Mai" else "${draft.autoSilenceMinutes} min",
@@ -481,6 +498,14 @@ fun StepperRow(title: String, value: String, min: Int, max: Int, current: Int, o
         }
     },
 )
+
+private fun glyphStyleLabel(style: GlyphStyle) = when (style) {
+    GlyphStyle.CYCLE -> "Ora e campanella, a turno"
+    GlyphStyle.CLOCK -> "Ora corrente"
+    GlyphStyle.BELL -> "Campanella pulsante"
+    GlyphStyle.LABEL -> "Etichetta a scorrimento"
+    GlyphStyle.COUNTDOWN -> "Da quanto sta suonando"
+}
 
 @Composable
 private fun ringtoneName(uri: String?): String {

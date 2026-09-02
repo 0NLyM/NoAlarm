@@ -78,7 +78,7 @@ class AlarmService : Service() {
 
         play(alarm)
         if (alarm.vibrate) vibrate()
-        if (alarm.glyph) GlyphController.ring(this, alarm.label)
+        if (alarm.glyph) GlyphController.ring(this, alarm.label, alarm.glyphStyle)
         listenScreenOff()
         listenMotion()
 

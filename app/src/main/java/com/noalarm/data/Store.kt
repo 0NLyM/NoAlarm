@@ -121,7 +121,8 @@ object Store {
         put("snoozeStepMinutes", a.snoozeStepMinutes)
         put("snoozeMinMinutes", a.snoozeMinMinutes); put("snoozeMaxMinutes", a.snoozeMaxMinutes)
         put("snoozeLimit", a.snoozeLimit)
-        put("glyph", a.glyph); put("skipNext", a.skipNext); put("snoozedUntil", a.snoozedUntil)
+        put("glyph", a.glyph); put("glyphStyle", a.glyphStyle.name)
+        put("skipNext", a.skipNext); put("snoozedUntil", a.snoozedUntil)
     }
 
     private fun alarmOf(o: JSONObject) = Alarm(
@@ -140,6 +141,8 @@ object Store {
         snoozeMaxMinutes = o.optInt("snoozeMaxMinutes", 60),
         snoozeLimit = o.optInt("snoozeLimit", 0),
         glyph = o.optBoolean("glyph", true),
+        glyphStyle = runCatching { GlyphStyle.valueOf(o.optString("glyphStyle", "CYCLE")) }
+            .getOrDefault(GlyphStyle.CYCLE),
         skipNext = o.optBoolean("skipNext", false),
         snoozedUntil = o.optLong("snoozedUntil", 0L),
     )

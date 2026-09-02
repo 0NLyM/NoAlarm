@@ -2,6 +2,7 @@ package com.noalarm.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.Orientation
@@ -42,17 +43,18 @@ import kotlin.math.roundToInt
 // Geometria della griglia, in celle di punti.
 private const val DIGIT_H = DotFont.H          // 7 righe per cifra
 private const val ITEM_H = DIGIT_H + 4         // passo fra due valori del rullo
-private const val ROWS = 19                    // righe visibili nella finestra
+private const val ROWS = DIGIT_H               // la griglia e' alta quanto una cifra
+private val TOUCH_H = 132.dp                   // area di trascinamento, piu' alta della griglia
 private const val PAIR_W = 11                  // due cifre: 5 + 1 + 5
 private val CELL = 8.dp
 
 /**
  * Selettore dell'orario in stile Nothing.
  *
- * La griglia di punti spenti e' **fissa**, come i LED di un display vero: quello
- * che scorre sono solo i punti accesi, che si spostano di una cella alla volta
- * mentre trascini. Le cifre lontane dal centro sbiadiscono invece di rimpicciolire,
- * cosi' l'allineamento della griglia non si rompe mai.
+ * La griglia di punti spenti e' **fissa** e alta quanto una cifra, come una riga
+ * di LED: quello che scorre sono solo i punti accesi, che si spostano di una
+ * cella alla volta mentre trascini. L'area sensibile al dito e' piu' alta della
+ * griglia, cosi' il gesto resta comodo.
  */
 @Composable
 fun DotTimePicker(
@@ -90,7 +92,7 @@ fun DotTimePicker(
     val height = CELL * ROWS
 
     Row(modifier, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(width, height)) {
+        Box(Modifier.width(width).height(TOUCH_H), contentAlignment = Alignment.Center) {
             Canvas(Modifier.size(width, height)) {
                 val p = cellPx
                 val r = p * 0.34f
@@ -176,9 +178,13 @@ private fun DragArea(width: Dp, itemPx: Float, pos: Animatable<Float, AnimationV
                     scope.launch { pos.snapTo(pos.value - delta / itemPx) }
                 },
                 onDragStopped = { velocity ->
-                    // Un filo di inerzia, poi si aggancia al valore piu' vicino.
-                    val target = (pos.value - velocity / itemPx * 0.10f).roundToInt().toFloat()
-                    pos.animateTo(target, spring(dampingRatio = 0.8f, stiffness = 400f))
+                    // Poco attrito: il carosello continua a girare in proporzione
+                    // alla velocita' del gesto, poi si aggancia al valore piu' vicino.
+                    pos.animateDecay(-velocity / itemPx, exponentialDecay(frictionMultiplier = 0.3f))
+                    pos.animateTo(
+                        pos.value.roundToInt().toFloat(),
+                        spring(dampingRatio = 0.9f, stiffness = 500f),
+                    )
                 },
             )
     )
@@ -201,7 +207,7 @@ private fun DrawScope.wheel(
     for (k in from..from + 3) {
         val distance = abs(k - pos)
         if (distance > 1.7f) continue
-        val alpha = 1f - 0.74f * distance.coerceAtMost(1f)
+        val alpha = 1f - 0.5f * distance.coerceAtMost(1f)
         val grid = DotFont.render("%02d".format(values[k.mod(values.size)]), 1)
         val yTop = (top + (k - pos) * ITEM_H).roundToInt()
         for (y in 0 until DIGIT_H) {

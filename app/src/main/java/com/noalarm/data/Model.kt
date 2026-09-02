@@ -8,6 +8,9 @@ import java.time.ZoneId
 
 enum class KeyAction { NONE, SNOOZE, DISMISS, VOLUME }
 
+/** Cosa disegna la Glyph Matrix mentre questa sveglia suona. */
+enum class GlyphStyle { CYCLE, CLOCK, BELL, LABEL, COUNTDOWN }
+
 data class Alarm(
     val id: Long,
     val hour: Int = 7,
@@ -34,6 +37,7 @@ data class Alarm(
     /** 0 = rinvii illimitati. */
     val snoozeLimit: Int = 0,
     val glyph: Boolean = true,
+    val glyphStyle: GlyphStyle = GlyphStyle.CYCLE,
     /** Salta la prossima occorrenza (equivalente di "Ignora sveglia" di Google Clock). */
     val skipNext: Boolean = false,
     /** > 0 quando la sveglia e' posticipata: istante del prossimo squillo. */

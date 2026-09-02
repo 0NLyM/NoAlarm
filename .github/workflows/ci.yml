@@ -26,6 +26,11 @@ jobs:
       - name: Build debug
         run: ./gradlew assembleDebug --no-daemon --console=plain --stacktrace
 
+      # Il build di release passa da R8: e' l'unico modo di verificare che le
+      # regole ProGuard reggano l'assenza delle classi Glyph (compileOnly).
+      - name: Build release (non firmato)
+        run: ./gradlew assembleRelease --no-daemon --console=plain --stacktrace
+
       - name: Lint
         continue-on-error: true
         run: ./gradlew lintDebug --no-daemon --console=plain

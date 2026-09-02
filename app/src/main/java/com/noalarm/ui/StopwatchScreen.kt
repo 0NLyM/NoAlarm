@@ -42,10 +42,30 @@ fun StopwatchScreen() {
             Modifier.fillMaxWidth().height(80.dp),
             cell = 8.dp,
             color = MaterialTheme.colorScheme.onBackground,
-            offColor = MaterialTheme.colorScheme.outline,
         )
-        Spacer(Modifier.height(32.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Spacer(Modifier.height(24.dp))
+        LazyColumn(
+            Modifier.fillMaxWidth().weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            itemsIndexed(sw.laps.reversed()) { i, lap ->
+                val index = sw.laps.size - i
+                val previous = if (index >= 2) sw.laps[index - 2] else 0L
+                RowItem(
+                    title = "GIRO %02d".format(index),
+                    subtitle = "Totale ${Format.stopwatch(lap)}",
+                    trailing = {
+                        Text(Format.stopwatch(lap - previous), style = MaterialTheme.typography.bodyMedium)
+                    },
+                )
+            }
+        }
+        // I comandi stanno in fondo, dove arriva il pollice.
+        Row(
+            Modifier.padding(top = 16.dp, bottom = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             DotIconButton(
                 Icons.Outlined.Refresh, "Azzera",
                 { ClockService.stopwatchReset(context) },
@@ -66,24 +86,6 @@ fun StopwatchScreen() {
                 size = 64,
                 enabled = sw.running,
             )
-        }
-        Spacer(Modifier.height(24.dp))
-        LazyColumn(
-            Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp),
-        ) {
-            itemsIndexed(sw.laps.reversed()) { i, lap ->
-                val index = sw.laps.size - i
-                val previous = if (index >= 2) sw.laps[index - 2] else 0L
-                RowItem(
-                    title = "GIRO %02d".format(index),
-                    subtitle = "Totale ${Format.stopwatch(lap)}",
-                    trailing = {
-                        Text(Format.stopwatch(lap - previous), style = MaterialTheme.typography.bodyMedium)
-                    },
-                )
-            }
         }
     }
 }

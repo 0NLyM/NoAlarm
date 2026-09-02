@@ -82,12 +82,15 @@ fun TimerScreen() {
     }
 }
 
+/** Minuti aggiunti dal pulsante di prolunga. */
+private const val TIMER_STEP = 1
+
 @Composable
 private fun TimerCard(t: TimerItem, now: Long) {
     val context = LocalContext.current
     val left = t.remaining(now)
     Panel {
-        Column(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 if (t.expired) "SCADUTO" else t.label.ifBlank { Format.timer(t.totalMs) }.uppercase(),
                 style = MaterialTheme.typography.labelMedium,
@@ -100,7 +103,6 @@ private fun TimerCard(t: TimerItem, now: Long) {
                 Modifier.fillMaxWidth().height(64.dp),
                 cell = 8.dp,
                 color = MaterialTheme.colorScheme.onSurface,
-                offColor = MaterialTheme.colorScheme.outline,
             )
             Spacer(Modifier.height(12.dp))
             LinearProgressIndicator(
@@ -111,13 +113,17 @@ private fun TimerCard(t: TimerItem, now: Long) {
             )
             Spacer(Modifier.height(16.dp))
             Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DotIconButton(
-                    Icons.Outlined.MoreTime, "Aggiungi un minuto",
-                    { ClockService.timerAdd(context, t.id, 1) }, size = 56,
+                // Con un passo di un minuto basta il simbolo; se un giorno
+                // diventasse piu' grande, la quantita' va detta.
+                if (TIMER_STEP > 1) DotButton(
+                    "+$TIMER_STEP min",
+                    { ClockService.timerAdd(context, t.id, TIMER_STEP) }, size = 56,
+                ) else DotIconButton(
+                    Icons.Outlined.MoreTime, "Aggiungi $TIMER_STEP minuto",
+                    { ClockService.timerAdd(context, t.id, TIMER_STEP) }, size = 56,
                 )
                 DotIconButton(
                     if (t.running) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
@@ -166,7 +172,6 @@ private fun Keypad(
             cell = 7.dp,
             color = if (digits.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
             else MaterialTheme.colorScheme.onBackground,
-            offColor = MaterialTheme.colorScheme.outline,
         )
         Text("ORE · MINUTI · SECONDI", style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)

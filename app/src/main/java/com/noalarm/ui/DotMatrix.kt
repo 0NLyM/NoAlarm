@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
+import com.noalarm.ui.theme.LocalDotOff
 import androidx.compose.ui.unit.dp
 
 /**
@@ -19,7 +20,7 @@ fun DotText(
     modifier: Modifier = Modifier,
     cell: Dp = 6.dp,
     color: Color = Color.White,
-    offColor: Color? = null,
+    offColor: Color? = LocalDotOff.current,
     tracking: Int = 1,
 ) {
     val grid = DotFont.render(text, tracking)

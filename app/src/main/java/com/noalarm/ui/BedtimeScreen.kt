@@ -55,7 +55,6 @@ fun BedtimeScreen() {
                     Modifier.fillMaxWidth().height(64.dp),
                     cell = 9.dp,
                     color = MaterialTheme.colorScheme.onBackground,
-                    offColor = MaterialTheme.colorScheme.outline,
                 )
                 Spacer(Modifier.height(12.dp))
                 Text("DI SONNO PROGRAMMATO", style = MaterialTheme.typography.labelMedium,

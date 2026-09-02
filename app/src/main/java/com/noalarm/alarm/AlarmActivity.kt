@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AlarmOff
@@ -47,6 +48,7 @@ import com.noalarm.data.Alarm
 import com.noalarm.data.KeyAction
 import com.noalarm.data.Store
 import com.noalarm.ui.DotText
+import com.noalarm.ui.DotButton
 import com.noalarm.ui.DotIconButton
 import com.noalarm.ui.rememberNow
 import com.noalarm.ui.theme.NoAlarmTheme
@@ -143,12 +145,11 @@ private fun Ringing(
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
-            Modifier.fillMaxSize().padding(24.dp),
+            Modifier.fillMaxSize().padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(Modifier.height(48.dp))
+                Spacer(Modifier.height(72.dp))
                 Text(
                     alarm.label.ifBlank { "Sveglia" }.uppercase(),
                     style = MaterialTheme.typography.labelLarge,
@@ -161,7 +162,6 @@ private fun Ringing(
                     Modifier.fillMaxWidth().height(110.dp),
                     cell = 14.dp,
                     color = MaterialTheme.colorScheme.onBackground,
-                    offColor = MaterialTheme.colorScheme.outline,
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
@@ -170,6 +170,8 @@ private fun Ringing(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+
+            Spacer(Modifier.weight(1f))
 
             // Regolazione del rinvio con i pulsanti, alla Samsung.
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -183,34 +185,31 @@ private fun Ringing(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
-                    DotIconButton(
-                        Icons.Outlined.Remove, "Rinvia di meno", size = 56,
-                        enabled = !outOfSnoozes && minutes > alarm.snoozeMinMinutes,
-                        onClick = {
-                            minutes = (minutes - alarm.snoozeStepMinutes)
-                                .coerceAtLeast(alarm.snoozeMinMinutes)
-                            onSnoozeChange(minutes)
-                        },
-                    )
+                    val step = alarm.snoozeStepMinutes
+                    val less = {
+                        minutes = (minutes - step).coerceAtLeast(alarm.snoozeMinMinutes)
+                        onSnoozeChange(minutes)
+                    }
+                    val canLess = !outOfSnoozes && minutes > alarm.snoozeMinMinutes
+                    if (step > 1) DotButton("-$step", less, size = 56, enabled = canLess)
+                    else DotIconButton(Icons.Outlined.Remove, "Rinvia di meno", less, size = 56, enabled = canLess)
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         DotText(
                             minutes.toString(),
-                            Modifier.height(48.dp).fillMaxWidth(0.28f),
+                            Modifier.size(64.dp, 48.dp),
                             cell = 6.dp,
                             color = MaterialTheme.colorScheme.onBackground,
                         )
                         Text("MIN", style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    DotIconButton(
-                        Icons.Outlined.Add, "Rinvia di piu'", size = 56,
-                        enabled = !outOfSnoozes && minutes < alarm.snoozeMaxMinutes,
-                        onClick = {
-                            minutes = (minutes + alarm.snoozeStepMinutes)
-                                .coerceAtMost(alarm.snoozeMaxMinutes)
-                            onSnoozeChange(minutes)
-                        },
-                    )
+                    val more = {
+                        minutes = (minutes + step).coerceAtMost(alarm.snoozeMaxMinutes)
+                        onSnoozeChange(minutes)
+                    }
+                    val canMore = !outOfSnoozes && minutes < alarm.snoozeMaxMinutes
+                    if (step > 1) DotButton("+$step", more, size = 56, enabled = canMore)
+                    else DotIconButton(Icons.Outlined.Add, "Rinvia di piu'", more, size = 56, enabled = canMore)
                 }
                 if (snoozes > 0) {
                     Spacer(Modifier.height(8.dp))
@@ -222,9 +221,12 @@ private fun Ringing(
                 }
             }
 
+            Spacer(Modifier.weight(1f))
+
+            // Ben distanti: al buio, appena svegli, non ci si deve sbagliare.
             Row(
-                Modifier.fillMaxWidth().padding(bottom = 32.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                Modifier.fillMaxWidth().padding(bottom = 56.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 DotIconButton(

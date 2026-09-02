@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -59,7 +60,6 @@ fun WorldClockScreen() {
                         Modifier.fillMaxWidth().height(90.dp),
                         cell = if (settings.showSeconds) 8.dp else 12.dp,
                         color = MaterialTheme.colorScheme.onBackground,
-                        offColor = MaterialTheme.colorScheme.outline,
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
@@ -80,9 +80,11 @@ fun WorldClockScreen() {
                         subtitle = "${Format.zoneOffset(zone)} · ${Format.zoneRegion(zone)}",
                         trailing = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
+                                DotText(
                                     there?.let { Format.clock(it, settings.use24h) } ?: "--:--",
-                                    style = MaterialTheme.typography.headlineSmall,
+                                    Modifier.size(104.dp, 28.dp),
+                                    cell = 3.5.dp,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 IconButton(onClick = {
                                     Store.update { s -> s.copy(worldClocks = s.worldClocks - zone) }

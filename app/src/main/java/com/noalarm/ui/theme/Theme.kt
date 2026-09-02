@@ -7,7 +7,9 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -24,6 +26,13 @@ val Surface2 = Color(0xFF1C1C1C)
 val Chalk = Color(0xFFFFFFFF)
 val Muted = Color(0xFF8A8A8A)
 val Line = Color(0xFF2A2A2A)
+
+// Punti spenti della griglia dot-matrix. Volutamente molto vicini al fondo:
+// devono suggerire il display senza rubare contrasto alle cifre accese.
+val DotOffDark = Color(0xFF171717)
+val DotOffLight = Color(0xFFDCDCD6)
+
+val LocalDotOff = staticCompositionLocalOf { DotOffDark }
 
 private val Dark = darkColorScheme(
     primary = Chalk,
@@ -91,5 +100,7 @@ fun NoAlarmTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () 
         WindowCompat.getInsetsController(view.window, view.window.decorView)
             .isAppearanceLightStatusBars = !dark
     }
-    MaterialTheme(colorScheme = scheme, typography = Type, content = content)
+    CompositionLocalProvider(LocalDotOff provides if (dark) DotOffDark else DotOffLight) {
+        MaterialTheme(colorScheme = scheme, typography = Type, content = content)
+    }
 }

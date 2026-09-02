@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -91,7 +94,6 @@ fun AlarmScreen() {
                             Modifier.fillMaxWidth().height(84.dp),
                             cell = 11.dp,
                             color = MaterialTheme.colorScheme.onBackground,
-                            offColor = MaterialTheme.colorScheme.outline,
                         )
                     }
                 }
@@ -100,8 +102,14 @@ fun AlarmScreen() {
             // Sveglia fissa della routine del sonno, come in Google Clock:
             // sta in cima all'elenco e apre la finestra Riposo.
             item {
-                Box(Modifier.padding(horizontal = 16.dp)) {
-                    BedtimeRow(onClick = { bedtime = true })
+                Column {
+                    Box(Modifier.padding(horizontal = 16.dp)) {
+                        BedtimeRow(onClick = { bedtime = true })
+                    }
+                    HorizontalDivider(
+                        Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        color = MaterialTheme.colorScheme.outline,
+                    )
                 }
             }
 
@@ -150,9 +158,14 @@ fun AlarmScreen() {
     if (bedtime) BedtimeSheet { bedtime = false }
 }
 
-/** Riga fissa in cima all'elenco: apre la routine del sonno. */
+/**
+ * Riga fissa in cima all'elenco, nello stesso stile delle sveglie: mostra l'ora
+ * del risveglio in dot-matrix e apre la routine del sonno. La separa dal resto
+ * un filetto, perche' non e' una sveglia come le altre.
+ */
 @Composable
 private fun BedtimeRow(onClick: () -> Unit) {
+    val context = LocalContext.current
     val s by Store.settings.collectAsStateWithLifecycle()
     val sleep = Duration.between(
         LocalTime.of(s.bedtimeHour, s.bedtimeMinute),
@@ -161,29 +174,48 @@ private fun BedtimeRow(onClick: () -> Unit) {
 
     Panel(onClick = onClick) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Outlined.Bedtime,
-                "Routine del sonno",
-                tint = if (s.bedtimeEnabled) MaterialTheme.colorScheme.secondary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Column(Modifier.weight(1f).padding(start = 16.dp)) {
-                Text(
-                    "%s → %s".format(
-                        Format.hhmm(s.bedtimeHour, s.bedtimeMinute, s.use24h),
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Outlined.Bedtime,
+                        "Routine del sonno",
+                        Modifier.size(18.dp),
+                        tint = if (s.bedtimeEnabled) MaterialTheme.colorScheme.secondary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    DotText(
                         Format.hhmm(s.wakeHour, s.wakeMinute, s.use24h),
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                        Modifier.height(40.dp).width(150.dp),
+                        cell = 5.dp,
+                        color = if (s.bedtimeEnabled) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    if (s.bedtimeEnabled) "%dh%02d di sonno · %s".format(
-                        sleep.toHours(), sleep.toMinutes() % 60,
-                        Format.daysLabel(s.bedtimeDays, s.dayOrder()),
-                    ) else "Routine del sonno disattivata",
+                    if (s.bedtimeEnabled)
+                        "A letto %s · %dh%02d · %s".format(
+                            Format.hhmm(s.bedtimeHour, s.bedtimeMinute, s.use24h),
+                            sleep.toHours(), sleep.toMinutes() % 60,
+                            Format.daysLabel(s.bedtimeDays, s.dayOrder()),
+                        )
+                    else "Routine del sonno disattivata",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Switch(
+                checked = s.bedtimeEnabled,
+                onCheckedChange = { on ->
+                    Store.update { it.copy(bedtimeEnabled = on) }
+                    AlarmScheduler.scheduleBedtime(context)
+                },
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = MaterialTheme.colorScheme.secondary,
+                    checkedThumbColor = MaterialTheme.colorScheme.onSecondary,
+                ),
+            )
         }
     }
 }
@@ -233,7 +265,6 @@ private fun AlarmRow(
                 cell = 5.dp,
                 color = if (alarm.enabled) MaterialTheme.colorScheme.onSurface
                 else MaterialTheme.colorScheme.onSurfaceVariant,
-                offColor = MaterialTheme.colorScheme.outline,
             )
             Spacer(Modifier.height(8.dp))
             Text(

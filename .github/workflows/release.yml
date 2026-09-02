@@ -11,6 +11,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +32,10 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-35 build-tools;35.0.0 platform-tools"
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Ricostruisci il keystore
@@ -44,7 +49,7 @@ jobs:
           NOALARM_STORE_PASSWORD: ${{ secrets.NOALARM_STORE_PASSWORD }}
           NOALARM_KEY_ALIAS: ${{ secrets.NOALARM_KEY_ALIAS }}
           NOALARM_KEY_PASSWORD: ${{ secrets.NOALARM_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease bundleRelease --stacktrace
+        run: ./gradlew assembleRelease bundleRelease --no-daemon --console=plain --stacktrace
 
       - name: Verifica la firma
         run: |

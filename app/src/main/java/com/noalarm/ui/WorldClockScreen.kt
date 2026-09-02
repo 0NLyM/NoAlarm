@@ -1,0 +1,148 @@
+package com.noalarm.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.noalarm.Format
+import com.noalarm.data.Store
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZonedDateTime
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WorldClockScreen() {
+    val settings by Store.settings.collectAsStateWithLifecycle()
+    val now = rememberNow(if (settings.showSeconds) 1000L else 15_000L)
+    var picking by remember { mutableStateOf(false) }
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 120.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item {
+                val here = ZonedDateTime.ofInstant(Instant.ofEpochMilli(now), ZoneId.systemDefault())
+                Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    DotText(
+                        Format.clock(here, settings.use24h, settings.showSeconds),
+                        Modifier.fillMaxWidth().height(90.dp),
+                        cell = if (settings.showSeconds) 8.dp else 12.dp,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        offColor = MaterialTheme.colorScheme.outline,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "${Format.dayLabel(here.dayOfWeek, false)} ${here.dayOfMonth} · ${ZoneId.systemDefault().id}".uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            items(settings.worldClocks, key = { it }) { zone ->
+                val there = runCatching {
+                    ZonedDateTime.ofInstant(Instant.ofEpochMilli(now), ZoneId.of(zone))
+                }.getOrNull()
+                Box(Modifier.padding(horizontal = 16.dp)) {
+                    RowItem(
+                        title = Format.zoneCity(zone),
+                        subtitle = "${Format.zoneOffset(zone)} · ${Format.zoneRegion(zone)}",
+                        trailing = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    there?.let { Format.clock(it, settings.use24h) } ?: "--:--",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                )
+                                IconButton(onClick = {
+                                    Store.update { s -> s.copy(worldClocks = s.worldClocks - zone) }
+                                }) { Icon(Icons.Outlined.Close, "Rimuovi") }
+                            }
+                        },
+                    )
+                }
+            }
+        }
+
+        FloatingActionButton(
+            onClick = { picking = true },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+            containerColor = MaterialTheme.colorScheme.secondary,
+            contentColor = MaterialTheme.colorScheme.onSecondary,
+        ) { Icon(Icons.Outlined.Add, "Aggiungi citta'") }
+    }
+
+    if (picking) {
+        val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { picking = false },
+            sheetState = sheet,
+            containerColor = MaterialTheme.colorScheme.background,
+        ) { ZonePicker { zone -> Store.update { s -> s.copy(worldClocks = (s.worldClocks + zone).distinct()) }; picking = false } }
+    }
+}
+
+@Composable
+private fun ZonePicker(onPick: (String) -> Unit) {
+    var query by remember { mutableStateOf("") }
+    val all = remember {
+        ZoneId.getAvailableZoneIds().filter { '/' in it && !it.startsWith("Etc/") }.sorted()
+    }
+    val shown = remember(query) {
+        if (query.isBlank()) all.take(60)
+        else all.filter { it.replace('_', ' ').contains(query, ignoreCase = true) }.take(60)
+    }
+
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            label = { Text("Cerca citta'") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(12.dp))
+        LazyColumn(
+            Modifier.fillMaxWidth().height(420.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(shown, key = { it }) { zone ->
+                RowItem(
+                    title = Format.zoneCity(zone),
+                    subtitle = "${Format.zoneRegion(zone)} · ${Format.zoneOffset(zone)}",
+                    onClick = { onPick(zone) },
+                )
+            }
+        }
+    }
+}

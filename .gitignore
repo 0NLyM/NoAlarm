@@ -1,0 +1,19 @@
+# Build
+build/
+.gradle/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Firma: le chiavi non entrano mai nel repository
+*.jks
+*.keystore
+keystore.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+captures/

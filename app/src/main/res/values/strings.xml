@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">NoAlarm</string>
+    <string name="channel_alarm">Sveglie</string>
+    <string name="channel_upcoming">Sveglia imminente</string>
+    <string name="channel_timer">Timer e cronometro</string>
+    <string name="channel_bedtime">Ora di dormire</string>
+</resources>

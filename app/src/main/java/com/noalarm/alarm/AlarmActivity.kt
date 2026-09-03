@@ -308,11 +308,11 @@ private fun ClosingOverlay(reason: ClosingReason, onFinished: () -> Unit) {
     val textAlpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        progress.animateTo(1f, tween(360, easing = FastOutSlowInEasing))
-        textAlpha.animateTo(1f, tween(160))
+        progress.animateTo(1f, tween(650, easing = FastOutSlowInEasing))
+        textAlpha.animateTo(1f, tween(200))
         delay(650)
-        textAlpha.animateTo(0f, tween(140))
-        progress.animateTo(0f, tween(320, easing = FastOutSlowInEasing))
+        textAlpha.animateTo(0f, tween(180))
+        progress.animateTo(0f, tween(600, easing = FastOutSlowInEasing))
         onFinished()
     }
 

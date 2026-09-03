@@ -44,14 +44,17 @@ fun GlyphStylePreview(
     // 12 fps come sulla matrice vera, cosi' l'anteprima ha lo stesso ritmo.
     val elapsedMs = rememberNow(1000L / GlyphRenderer.FPS)
     val matrix = remember(style) { Matrix() }
+    // I colori sono @Composable: vanno letti qui, non dentro la lambda di
+    // disegno di Canvas, che gira con un DrawScope come receiver.
+    val background = MaterialTheme.colorScheme.background
+    val off = MaterialTheme.colorScheme.onSurfaceVariant
+    val on = MaterialTheme.colorScheme.onBackground
 
-    Canvas(modifier.background(MaterialTheme.colorScheme.background)) {
+    Canvas(modifier.background(background)) {
         val frame = (elapsedMs / (1000L / GlyphRenderer.FPS)).toInt()
         GlyphRenderer.ringing(matrix, style, label.uppercase(), settings.use24h, frame)
         val p = cell.toPx()
         val r = p * 0.36f
-        val off = MaterialTheme.colorScheme.onSurfaceVariant
-        val on = MaterialTheme.colorScheme.onBackground
         for (y in 0 until Matrix.SIZE) for (x in 0 until Matrix.SIZE) {
             val level = matrix.pixels[y * Matrix.SIZE + x]
             drawCircle(
@@ -88,7 +91,7 @@ fun GlyphStyleCard(
         .padding(8.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
 ) {
-    GlyphStylePreview(style, label, Modifier.size(Matrix.SIZE * 3.dp))
+    GlyphStylePreview(style, label, Modifier.size((Matrix.SIZE * 3).dp))
     Spacer(Modifier.height(6.dp))
     Text(
         name,

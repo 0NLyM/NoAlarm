@@ -124,6 +124,36 @@ fun DotIconButton(
     )
 }
 
+/**
+ * Pulsante largo a forma di pillola, con il testo per intero: per le due azioni
+ * della sveglia che suona, dove un'icona sola rischia l'ambiguo appena svegli.
+ */
+@Composable
+fun DotPillButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    height: Int = 72,
+    width: Int = 156,
+    color: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    enabled: Boolean = true,
+) = Box(
+    modifier
+        .size(width.dp, height.dp)
+        .clip(RoundedCornerShape(50))
+        .background(if (enabled) color else color.copy(alpha = 0.4f))
+        .clickable(enabled = enabled, onClick = onClick),
+    contentAlignment = Alignment.Center,
+) {
+    Text(
+        label.uppercase(),
+        style = MaterialTheme.typography.labelLarge,
+        color = if (enabled) contentColor else contentColor.copy(alpha = 0.4f),
+        textAlign = TextAlign.Center,
+    )
+}
+
 @Composable
 fun Rows(content: @Composable () -> Unit) = Column(
     Modifier.fillMaxWidth().padding(horizontal = 16.dp),

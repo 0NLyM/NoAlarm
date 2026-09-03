@@ -20,9 +20,9 @@ object GlyphRenderer {
     fun snoozed(matrix: Matrix, snoozeUntil: Long) {
         matrix.clear()
         val left = ((snoozeUntil - System.currentTimeMillis()).coerceAtLeast(0) + 59_999) / 60_000
-        matrix.textCentered("ZZ", 2, 90)
+        matrix.textCentered("ZZ", 2, 180)
         matrix.textCentered(left.toString(), 10, 255)
-        matrix.textCentered("MIN", 18, 70)
+        matrix.textCentered("MIN", 18, 160)
     }
 
     fun ringing(matrix: Matrix, style: GlyphStyle, label: String, use24h: Boolean, frame: Int) {
@@ -46,28 +46,28 @@ object GlyphRenderer {
         matrix.textCentered("%02d".format(h), 3)
         matrix.textCentered("%02d".format(now.minute), 15)
         if (now.second % 2 == 0) {              // i due punti lampeggiano al secondo
-            matrix.set(12, 11, 200)
-            matrix.set(12, 13, 200)
+            matrix.set(12, 11, 255)
+            matrix.set(12, 13, 255)
         }
     }
 
     private fun bell(matrix: Matrix, frame: Int) {
-        val pulse = (60 + abs((frame % 12) - 6) * 32).coerceAtMost(255)
+        val pulse = (150 + abs((frame % 12) - 6) * 17).coerceAtMost(255)
         matrix.bitmapCentered(Matrix.BELL, 2, pulse)
     }
 
     private fun scrollingLabel(matrix: Matrix, label: String, frame: Int) {
         if (label.isEmpty()) return
         val span = DotFont.width(label) + Matrix.SIZE
-        matrix.text(label, Matrix.SIZE - (frame * 2 % span), 17, 120)
+        matrix.text(label, Matrix.SIZE - (frame * 2 % span), 17, 220)
     }
 
     /** Da quanto sta suonando: utile per capire a colpo d'occhio se e' in ritardo. */
     private fun countdown(matrix: Matrix, frame: Int) {
         val seconds = frame / FPS
-        matrix.textCentered("SUONA", 2, 90)
+        matrix.textCentered("SUONA", 2, 180)
         matrix.textCentered("%02d".format(seconds / 60), 10)
-        matrix.textCentered("%02d".format(seconds % 60), 18, 140)
+        matrix.textCentered("%02d".format(seconds % 60), 18, 220)
     }
 
     fun printable(c: Char) = c.isLetterOrDigit() || c == ' ' || c == ':' || c == '-'

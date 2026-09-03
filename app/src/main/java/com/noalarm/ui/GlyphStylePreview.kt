@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -26,12 +27,17 @@ import com.noalarm.data.GlyphStyle
 import com.noalarm.data.Store
 import com.noalarm.glyph.GlyphRenderer
 import com.noalarm.glyph.Matrix
+import kotlin.math.sqrt
 
 /**
  * Anteprima animata di come [style] appare sulla Glyph Matrix: usa lo stesso
  * [GlyphRenderer] che disegna l'hardware vero, quindi cio' che si vede qui e'
  * esattamente cio' che suonera' sul retro del telefono - non serve un Nothing
  * Phone per vederlo, e' puro rendering di pixel, nessuna chiamata alla SDK.
+ *
+ * Lo sfondo di punti spenti e' ritagliato in un cerchio, come la matrice fisica
+ * del Phone (3): fuori da quel cerchio non si disegna nulla, cosi' la forma
+ * resta quella vera invece di un quadrato pieno di puntini.
  */
 @Composable
 fun GlyphStylePreview(
@@ -39,26 +45,29 @@ fun GlyphStylePreview(
     label: String,
     modifier: Modifier = Modifier,
     cell: Dp = 3.dp,
+    onColor: Color = MaterialTheme.colorScheme.onBackground,
+    offColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    backgroundColor: Color = MaterialTheme.colorScheme.background,
 ) {
     val settings by Store.settings.collectAsStateWithLifecycle()
     // 12 fps come sulla matrice vera, cosi' l'anteprima ha lo stesso ritmo.
     val elapsedMs = rememberNow(1000L / GlyphRenderer.FPS)
     val matrix = remember(style) { Matrix() }
-    // I colori sono @Composable: vanno letti qui, non dentro la lambda di
-    // disegno di Canvas, che gira con un DrawScope come receiver.
-    val background = MaterialTheme.colorScheme.background
-    val off = MaterialTheme.colorScheme.onSurfaceVariant
-    val on = MaterialTheme.colorScheme.onBackground
 
-    Canvas(modifier.background(background)) {
+    Canvas(modifier.background(backgroundColor)) {
         val frame = (elapsedMs / (1000L / GlyphRenderer.FPS)).toInt()
         GlyphRenderer.ringing(matrix, style, label.uppercase(), settings.use24h, frame)
         val p = cell.toPx()
         val r = p * 0.36f
+        val center = (Matrix.SIZE - 1) / 2f
+        val radius = Matrix.SIZE / 2f
         for (y in 0 until Matrix.SIZE) for (x in 0 until Matrix.SIZE) {
+            val dx = x - center
+            val dy = y - center
+            if (sqrt(dx * dx + dy * dy) > radius) continue
             val level = matrix.pixels[y * Matrix.SIZE + x]
             drawCircle(
-                if (level > 0) on.copy(alpha = (level / 255f).coerceIn(0.25f, 1f)) else off,
+                if (level > 0) onColor.copy(alpha = (level / 255f).coerceIn(0.25f, 1f)) else offColor,
                 r,
                 Offset(x * p + p / 2, y * p + p / 2),
             )

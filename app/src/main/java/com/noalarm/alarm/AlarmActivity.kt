@@ -8,11 +8,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AlarmOff
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Snooze
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,17 +44,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.noalarm.Format
 import com.noalarm.data.Alarm
 import com.noalarm.data.KeyAction
 import com.noalarm.data.Store
-import com.noalarm.ui.DotText
+import com.noalarm.glyph.Matrix
 import com.noalarm.ui.DotButton
 import com.noalarm.ui.DotIconButton
+import com.noalarm.ui.DotPillButton
+import com.noalarm.ui.DotText
+import com.noalarm.ui.GlyphStylePreview
 import com.noalarm.ui.rememberNow
 import com.noalarm.ui.theme.NoAlarmTheme
+import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -84,13 +92,36 @@ class AlarmActivity : ComponentActivity() {
         setContent {
             NoAlarmTheme(dark = true) {
                 val ringing by AlarmService.ringing.collectAsStateWithLifecycle()
-                LaunchedEffect(ringing) { if (ringing == 0L) finishAndRemoveTask() }
-                Ringing(
-                    alarm = alarm,
-                    onSnoozeChange = { snoozeMinutes = it },
-                    onSnooze = { AlarmService.snooze(this, it) },
-                    onDismiss = { AlarmService.dismiss(this) },
-                )
+                // null finche' l'utente non agisce (o il servizio si ferma da solo,
+                // per esempio dal pulsante Glyph o dal silenziamento automatico):
+                // in quel caso si mostra comunque la stessa animazione di chiusura.
+                var closing by remember { mutableStateOf<ClosingReason?>(null) }
+
+                LaunchedEffect(ringing) {
+                    if (ringing == 0L && closing == null) closing = ClosingReason.Dismissed
+                }
+                LaunchedEffect(closing) {
+                    if (closing != null) {
+                        delay(1100)
+                        finishAndRemoveTask()
+                    }
+                }
+
+                Box(Modifier.fillMaxSize()) {
+                    Ringing(
+                        alarm = alarm,
+                        onSnoozeChange = { snoozeMinutes = it },
+                        onSnooze = { m ->
+                            closing = ClosingReason.Snoozed(m)
+                            AlarmService.snooze(this@AlarmActivity, m)
+                        },
+                        onDismiss = {
+                            closing = ClosingReason.Dismissed
+                            AlarmService.dismiss(this@AlarmActivity)
+                        },
+                    )
+                    closing?.let { ClosingOverlay(it) }
+                }
             }
         }
     }
@@ -123,6 +154,12 @@ class AlarmActivity : ComponentActivity() {
 
 }
 
+/** Perche' la schermata si sta chiudendo: decide cosa mostra l'animazione finale. */
+private sealed interface ClosingReason {
+    data class Snoozed(val minutes: Int) : ClosingReason
+    data object Dismissed : ClosingReason
+}
+
 @Composable
 private fun Ringing(
     alarm: Alarm,
@@ -149,21 +186,21 @@ private fun Ringing(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(Modifier.height(72.dp))
+                Spacer(Modifier.height(56.dp))
                 Text(
                     alarm.label.ifBlank { "Sveglia" }.uppercase(),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.alpha(pulse),
                 )
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(20.dp))
                 DotText(
                     Format.clock(time, settings.use24h),
-                    Modifier.fillMaxWidth().height(110.dp),
-                    cell = 14.dp,
+                    Modifier.fillMaxWidth().height(96.dp),
+                    cell = 12.dp,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
                     "${Format.dayLabel(time.dayOfWeek, false)} ${time.dayOfMonth}".uppercase(),
                     style = MaterialTheme.typography.labelMedium,
@@ -171,7 +208,22 @@ private fun Ringing(
                 )
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.weight(0.6f))
+
+            // L'animazione che sta suonando davvero sul retro del telefono,
+            // sempre in bianco su nero: qui non e' un'anteprima, e' lo specchio.
+            if (alarm.glyph) {
+                GlyphStylePreview(
+                    style = alarm.glyphStyle,
+                    label = alarm.label,
+                    modifier = Modifier.size((Matrix.SIZE * 4).dp),
+                    cell = 4.dp,
+                    onColor = Color.White,
+                    offColor = Color(0xFF1A1A1A),
+                    backgroundColor = Color.Black,
+                )
+                Spacer(Modifier.weight(0.5f))
+            }
 
             // Regolazione del rinvio con i pulsanti, alla Samsung.
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -223,26 +275,57 @@ private fun Ringing(
 
             Spacer(Modifier.weight(1f))
 
-            // Ben distanti: al buio, appena svegli, non ci si deve sbagliare.
+            // Larghe e con il testo per intero: al buio, appena svegli, un'icona
+            // sola fra "posticipa" e "spegni" e' facile da confondere.
             Row(
-                Modifier.fillMaxWidth().padding(bottom = 56.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                Modifier.fillMaxWidth().padding(bottom = 48.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DotIconButton(
-                    Icons.Outlined.Snooze,
-                    "Posticipa di $minutes minuti",
+                DotPillButton(
+                    "Posticipa",
                     onClick = { onSnooze(minutes) },
-                    size = 104,
                     enabled = !outOfSnoozes,
                 )
-                DotIconButton(
-                    Icons.Outlined.AlarmOff,
-                    "Spegni la sveglia",
+                DotPillButton(
+                    "Spegni",
                     onClick = onDismiss,
-                    size = 104,
                     color = MaterialTheme.colorScheme.secondary,
                     contentColor = MaterialTheme.colorScheme.onSecondary,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Chiusura a schermo nero, come Google Clock: uno sfondo che sfuma e una
+ * conferma al centro, poi l'activity si chiude da sola. Se la sveglia e'
+ * stata posticipata mostra per quanto, cosi' non resta il dubbio se il tocco
+ * sia andato a segno.
+ */
+@Composable
+private fun ClosingOverlay(reason: ClosingReason) {
+    val alpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { alpha.animateTo(1f, tween(280)) }
+
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = alpha.value)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (alpha.value > 0.6f) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    if (reason is ClosingReason.Snoozed) Icons.Outlined.Snooze else Icons.Outlined.AlarmOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = Color.White,
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    if (reason is ClosingReason.Snoozed) "POSTICIPATA DI ${reason.minutes} MIN" else "SVEGLIA SPENTA",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
                 )
             }
         }

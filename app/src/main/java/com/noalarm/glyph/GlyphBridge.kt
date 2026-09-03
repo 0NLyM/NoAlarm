@@ -6,14 +6,14 @@ import com.nothing.ketchum.Glyph
 import com.nothing.ketchum.GlyphMatrixManager
 
 /**
- * Unico punto di contatto con la SDK Glyph di Nothing.
- * Le classi `com.nothing.ketchum.*` sono `compileOnly`: esistono solo nel
- * framework dei Nothing Phone. Su qualsiasi altro device istanziare questa
- * classe lancia NoClassDefFoundError, che [GlyphController] intercetta.
+ * Unico punto di contatto con la Glyph Matrix SDK ufficiale di Nothing
+ * (Nothing-Developer-Programme/GlyphMatrix-Developer-Kit, vendorizzata in
+ * app/libs/glyph-matrix-sdk-2.0.aar). Su un device che non e' un Nothing Phone
+ * il classloading di `com.nothing.ketchum.*` fallisce: intercettato da
+ * [GlyphController], che lascia l'app inerte.
  *
- * Niente qui lancia verso l'alto: si riporta l'esito e si conserva l'ultimo
- * errore, perche' la diagnosi va mostrata all'utente - da qui la SDK vera non
- * e' ispezionabile.
+ * Nessun metodo lancia verso l'alto: l'esito e l'ultimo errore si riportano,
+ * perche' la diagnosi va mostrata all'utente nella schermata di prova.
  */
 internal class GlyphBridge(context: Context, private val onReady: () -> Unit) {
 
@@ -55,10 +55,9 @@ internal class GlyphBridge(context: Context, private val onReady: () -> Unit) {
     }
 
     /**
-     * @param appChannel usa `setAppMatrixFrame` invece di `setMatrixFrame`.
-     *   Quale dei due canali accetti i frame di un'app che non e' il Glyph Toy
-     *   attivo non e' documentato: si sceglie dalle impostazioni e si verifica
-     *   con la schermata di prova.
+     * @param appChannel usa `setAppMatrixFrame`: il canale per il controllo diretto
+     *   da un'app che non e' necessariamente il Glyph Toy attivo. `setMatrixFrame`
+     *   e' invece il canale dei Glyph Toy - vedi [NoAlarmGlyphToyService].
      */
     fun draw(frame: IntArray, appChannel: Boolean): Boolean {
         if (!connected) return false
@@ -71,6 +70,7 @@ internal class GlyphBridge(context: Context, private val onReady: () -> Unit) {
     fun close() {
         connected = false
         registered = false
+        attempt { manager.closeAppMatrix() }
         attempt { manager.turnOff() }
         attempt { manager.unInit() }
     }

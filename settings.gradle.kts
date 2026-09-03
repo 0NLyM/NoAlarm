@@ -14,4 +14,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "NoAlarm"
-include(":app", ":glyph")
+include(":app")

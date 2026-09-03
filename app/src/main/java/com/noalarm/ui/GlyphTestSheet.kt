@@ -60,11 +60,12 @@ fun GlyphTestSheet(onDismiss: () -> Unit) {
             )
 
             RowItem(
-                title = "Libreria Glyph sul dispositivo",
+                title = "Libreria Glyph",
                 subtitle = when (status.available) {
                     null -> "Non ancora verificata"
-                    true -> "Presente"
-                    false -> "Assente: questo non e' un Nothing Phone (3)"
+                    true -> "Caricata"
+                    false -> "Non caricata: non e' un Nothing Phone (3), oppure " +
+                        "manca l'autorizzazione com.nothing.ketchum.permission.ENABLE"
                 },
             )
             RowItem("Servizio connesso", if (status.connected) "Si'" else "No")
@@ -81,9 +82,21 @@ fun GlyphTestSheet(onDismiss: () -> Unit) {
                 Store.update { it.copy(glyphAppChannel = v) }
             }
             Text(
-                "Se con un canale la matrice resta spenta, ferma la prova, cambia " +
-                    "canale e riprova: e' l'unico modo per sapere quale dei due accetta " +
-                    "i frame di un'app che non e' il Glyph Toy attivo.",
+                "E' il canale che Nothing raccomanda per un'app che non e' il Glyph " +
+                    "Toy attivo (richiede l'aggiornamento software del telefono di " +
+                    "agosto 2025). Se con questo canale la matrice resta spenta, " +
+                    "ferma la prova, disattivalo e riprova con setMatrixFrame.",
+                Modifier.padding(horizontal = 4.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            SectionLabel("Pulsante sul retro")
+            Text(
+                "Arriva solo al Glyph Toy che hai scelto in Impostazioni > Glyph " +
+                    "Interface > Glyph Toys. Selezionando NoAlarm li' (non qui), " +
+                    "durante una sveglia una pressione posticipa e una pressione " +
+                    "lunga spegne.",
                 Modifier.padding(horizontal = 4.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

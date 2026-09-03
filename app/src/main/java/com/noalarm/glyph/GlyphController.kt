@@ -5,12 +5,8 @@ import android.os.Handler
 import android.os.HandlerThread
 import com.noalarm.data.GlyphStyle
 import com.noalarm.data.Store
-import com.noalarm.ui.DotFont
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import java.time.ZoneId
-import java.time.ZonedDateTime
-import kotlin.math.abs
 
 /** Cosa sta facendo la matrice, per la schermata di prova. */
 data class GlyphStatus(
@@ -26,16 +22,17 @@ data class GlyphStatus(
 )
 
 /**
- * Pilota la Glyph Matrix mentre la sveglia suona: ora corrente a caratteri
- * dot-matrix, campanella pulsante, etichetta a scorrimento e conto alla
- * rovescia del rinvio. Su device senza Glyph resta inerte.
+ * Pilota la Glyph Matrix mentre la sveglia suona, sul canale "app" della SDK
+ * (`setAppMatrixFrame`): quello pensato per il controllo diretto da un'app che
+ * non e' necessariamente il Glyph Toy selezionato, cosi' l'animazione si vede
+ * anche se l'utente non ha scelto NoAlarm come toy attivo. Il canale del toy
+ * vero e proprio - per quando lo ha scelto, e per il pulsante sul retro - e'
+ * [NoAlarmGlyphToyService], che riusa lo stesso [GlyphRenderer].
  */
 object GlyphController {
 
-    private const val FPS = 12L
-
     /** Frame consecutivi rifiutati prima di arrendersi (5 s). */
-    private const val MAX_FAILURES = 60
+    private const val MAX_FAILURES = GlyphRenderer.FPS * 5
 
     /** Intervallo minimo fra due tentativi di ripresa del possesso. */
     private const val RECLAIM_COOLDOWN_MS = 2_000L
@@ -60,7 +57,7 @@ object GlyphController {
 
     @Synchronized
     fun ring(context: Context, label: String, style: GlyphStyle = GlyphStyle.CYCLE) {
-        this.label = label.uppercase().filter(::printable)
+        this.label = label.uppercase().filter(GlyphRenderer::printable)
         // Senza etichetta lo stile "etichetta" non avrebbe niente da mostrare.
         this.style = if (style == GlyphStyle.LABEL && this.label.isBlank()) GlyphStyle.CLOCK else style
         start(context, Mode.RINGING)
@@ -121,9 +118,17 @@ object GlyphController {
     private fun tick() {
         val b = bridge ?: return
         if (mode == Mode.IDLE) return
-        render()
 
-        val appChannel = Store.settings.value.glyphAppChannel
+        val s = Store.settings.value
+        when (mode) {
+            Mode.SNOOZED -> GlyphRenderer.snoozed(matrix, snoozeUntil)
+            else -> GlyphRenderer.ringing(matrix, style, label, s.use24h, frame)
+        }
+
+        // La schermata di prova puo' forzare il canale toy (setMatrixFrame) per
+        // capire quale dei due il dispositivo accetta davvero da un'app; la
+        // sveglia vera usa sempre il canale app, come raccomandato dalla SDK.
+        val appChannel = mode != Mode.TEST || s.glyphAppChannel
         val ok = b.draw(matrix.pixels, appChannel)
         if (ok) {
             failures = 0
@@ -153,61 +158,6 @@ object GlyphController {
             rejected = _status.value.rejected + if (ok) 0 else 1,
             lastError = b.lastError,
         )
-        handler?.postDelayed(::tick, 1000L / FPS)
+        handler?.postDelayed(::tick, 1000L / GlyphRenderer.FPS)
     }
-
-    private fun render() {
-        matrix.clear()
-        val s = Store.settings.value
-        val now = ZonedDateTime.now(ZoneId.systemDefault())
-        if (mode == Mode.SNOOZED) {
-            val left = ((snoozeUntil - System.currentTimeMillis()).coerceAtLeast(0) + 59_999) / 60_000
-            matrix.textCentered("ZZ", 2, 90)
-            matrix.textCentered(left.toString(), 10, 255)
-            matrix.textCentered("MIN", 18, 70)
-            return
-        }
-        when (style) {
-            GlyphStyle.CLOCK -> clock(now, s.use24h)
-            GlyphStyle.BELL -> bell()
-            GlyphStyle.LABEL -> scrollingLabel()
-            GlyphStyle.COUNTDOWN -> countdownToNext()
-            // Ciclo di 4 s: 3 s di orologio, 1 s di campanella con l'etichetta.
-            GlyphStyle.CYCLE -> if ((frame / FPS.toInt()) % 4 == 3) {
-                bell()
-                scrollingLabel()
-            } else clock(now, s.use24h)
-        }
-    }
-
-    private fun clock(now: ZonedDateTime, use24h: Boolean) {
-        val h = if (use24h) now.hour else (now.hour % 12).let { if (it == 0) 12 else it }
-        matrix.textCentered("%02d".format(h), 3)
-        matrix.textCentered("%02d".format(now.minute), 15)
-        if (now.second % 2 == 0) {              // i due punti lampeggiano al secondo
-            matrix.set(12, 11, 200)
-            matrix.set(12, 13, 200)
-        }
-    }
-
-    private fun bell() {
-        val pulse = (60 + abs((frame % 12) - 6) * 32).coerceAtMost(255)
-        matrix.bitmapCentered(Matrix.BELL, 2, pulse)
-    }
-
-    private fun scrollingLabel() {
-        if (label.isEmpty()) return
-        val span = DotFont.width(label) + Matrix.SIZE
-        matrix.text(label, Matrix.SIZE - (frame * 2 % span), 17, 120)
-    }
-
-    /** Da quanto sta suonando: utile per capire a colpo d'occhio se e' in ritardo. */
-    private fun countdownToNext() {
-        val seconds = frame / FPS.toInt()
-        matrix.textCentered("SUONA", 2, 90)
-        matrix.textCentered("%02d".format(seconds / 60), 10)
-        matrix.textCentered("%02d".format(seconds % 60), 18, 140)
-    }
-
-    private fun printable(c: Char) = c.isLetterOrDigit() || c == ' ' || c == ':' || c == '-'
 }

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -398,15 +399,21 @@ private fun AlarmEditor(
             SwitchRow("Volume crescente", draft.gradualVolume) { draft = draft.copy(gradualVolume = it) }
             SwitchRow("Glyph Matrix mentre suona", draft.glyph) { draft = draft.copy(glyph = it) }
             if (draft.glyph) {
-                val styles = GlyphStyle.entries
-                RowItem(
-                    title = "Cosa mostra la matrice",
-                    subtitle = glyphStyleLabel(draft.glyphStyle),
-                    onClick = {
-                        val next = styles[(styles.indexOf(draft.glyphStyle) + 1).mod(styles.size)]
-                        draft = draft.copy(glyphStyle = next)
-                    },
-                )
+                SectionLabel("Cosa mostra la matrice")
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    GlyphStyle.entries.forEach { style ->
+                        GlyphStyleCard(
+                            style = style,
+                            label = draft.label,
+                            name = glyphStyleLabel(style),
+                            selected = style == draft.glyphStyle,
+                            onClick = { draft = draft.copy(glyphStyle = style) },
+                        )
+                    }
+                }
             }
             StepperRow(
                 "Silenzia dopo",
@@ -500,11 +507,11 @@ fun StepperRow(title: String, value: String, min: Int, max: Int, current: Int, o
 )
 
 private fun glyphStyleLabel(style: GlyphStyle) = when (style) {
-    GlyphStyle.CYCLE -> "Ora e campanella, a turno"
-    GlyphStyle.CLOCK -> "Ora corrente"
-    GlyphStyle.BELL -> "Campanella pulsante"
-    GlyphStyle.LABEL -> "Etichetta a scorrimento"
-    GlyphStyle.COUNTDOWN -> "Da quanto sta suonando"
+    GlyphStyle.CYCLE -> "Ciclo"
+    GlyphStyle.CLOCK -> "Ora"
+    GlyphStyle.BELL -> "Campanella"
+    GlyphStyle.LABEL -> "Etichetta"
+    GlyphStyle.COUNTDOWN -> "Timer"
 }
 
 @Composable

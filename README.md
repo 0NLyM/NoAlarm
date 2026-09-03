@@ -38,17 +38,36 @@ finisce sulla **Glyph Matrix** del Nothing Phone (3) mentre la sveglia suona.
 
 ## Glyph Matrix: come è integrata
 
-Le classi `com.nothing.ketchum.*` esistono solo nel framework dei Nothing Phone.
-Il modulo [`glyph/`](glyph/) ne contiene i **soli stub di compilazione**
-(`compileOnly`, non finiscono nell'APK) e il manifest dichiara
-`<uses-library android:name="com.nothing.ketchum" android:required="false"/>`.
+NoAlarm usa la SDK ufficiale di Nothing
+([`Nothing-Developer-Programme/GlyphMatrix-Developer-Kit`](https://github.com/Nothing-Developer-Programme/GlyphMatrix-Developer-Kit)),
+vendorizzata in [`app/libs/glyph-matrix-sdk-2.0.aar`](app/libs/glyph-matrix-sdk-2.0.aar).
+A differenza di una libreria di sistema, le classi `com.nothing.ketchum.*` vanno
+incluse nell'APK: comunicano via AIDL con il servizio Glyph del telefono, che
+richiede anche il permesso `com.nothing.ketchum.permission.ENABLE` e un
+`meta-data android:name="NothingKey"` nel manifest (`"test"`, il valore del
+progetto di esempio ufficiale — una chiave di produzione va richiesta a
+`GDKsupport@nothing.tech` prima di una pubblicazione pubblica). Per questo
+`minSdk` è 33: e' il minimo che l'AAR stesso dichiara.
 
-`GlyphController` isola ogni chiamata alla SDK dietro un `runCatching`: su un
-dispositivo che non espone la libreria l'inizializzazione fallisce e la funzione
-resta semplicemente inattiva, senza incidere sul resto dell'app.
+Ci sono due canali, entrambi passano da [`GlyphRenderer`](app/src/main/java/com/noalarm/glyph/GlyphRenderer.kt)
+cosi' l'animazione e' identica su entrambi:
 
-> Se una firma della SDK dovesse cambiare, l'effetto è che la matrice non si
-> accende — la sveglia continua a suonare normalmente.
+- **Canale app** (`setAppMatrixFrame`, in [`GlyphController`](app/src/main/java/com/noalarm/glyph/GlyphController.kt)) —
+  quello che Nothing raccomanda per un'app che non e' il Glyph Toy attivo. Si
+  accende da solo mentre la sveglia suona o e' posticipata, **indipendentemente
+  da quale Glyph Toy l'utente ha scelto**. Richiede l'aggiornamento software del
+  telefono di agosto 2025.
+- **Canale toy** (`setMatrixFrame`, in [`NoAlarmGlyphToyService`](app/src/main/java/com/noalarm/glyph/NoAlarmGlyphToyService.kt)) —
+  attivo solo se l'utente seleziona NoAlarm in *Impostazioni > Glyph Interface >
+  Glyph Toys*. E' anche l'unico modo di ricevere gli eventi del **pulsante Glyph**
+  sul retro del telefono (non e' un tasto Android: il sistema li instrada solo al
+  toy selezionato in quel momento) — durante una sveglia, una pressione
+  posticipa e una pressione lunga spegne.
+
+`GlyphBridge` non lancia mai verso l'alto: riporta esito ed errore invece di
+propagarli, cosi' *Impostazioni > Glyph Matrix > Prova la matrice* puo' mostrare
+una diagnosi vera (libreria caricata, servizio connesso, `register()` riuscito,
+frame accettati/rifiutati, l'eccezione esatta) invece di indovinare.
 
 ## Build
 

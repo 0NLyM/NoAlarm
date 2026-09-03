@@ -28,10 +28,12 @@ android {
 
     defaultConfig {
         applicationId = "com.noalarm"
-        minSdk = 26
+        // La Glyph Matrix SDK reale dichiara minSdk 33: sotto quella soglia il
+        // merge del manifest fallirebbe. Coerente con l'unico device che la usa.
+        minSdk = 33
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.1.4"
+        versionCode = 7
+        versionName = "1.2.0"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -77,7 +79,10 @@ android {
 }
 
 dependencies {
-    compileOnly(project(":glyph"))
+    // SDK ufficiale di Nothing (Nothing-Developer-Programme/GlyphMatrix-Developer-Kit).
+    // Va inclusa nell'APK: a runtime comunica via AIDL con il servizio di sistema, non e'
+    // una libreria fornita dal framework.
+    implementation(files("libs/glyph-matrix-sdk-2.0.aar"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-   >
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
@@ -30,8 +30,13 @@
         android:enableOnBackInvokedCallback="true"
         android:theme="@style/Theme.NoAlarm">
 
-        <!-- La libreria Glyph esiste solo sui device Nothing. -->
-        <uses-library android:name="com.nothing.ketchum" android:required="false" />
+        <!--
+          Richiesta dalla Glyph Matrix SDK per l'accesso "app-based" (setAppMatrixFrame).
+          "test" e' il valore usato dal progetto di esempio ufficiale Nothing per lo
+          sviluppo; una chiave di produzione va richiesta a GDKsupport@nothing.tech
+          prima di una pubblicazione pubblica.
+        -->
+        <meta-data android:name="NothingKey" android:value="test" />
 
         <activity
             android:name=".MainActivity"
@@ -102,6 +107,26 @@
             </intent-filter>
         </receiver>
 
+        <!--
+          Glyph Toy: e' l'unico modo di ricevere gli eventi del pulsante sul retro
+          (pressione, rilascio, pressione lunga) - arrivano solo al toy che l'utente
+          ha selezionato in Impostazioni > Glyph Interface > Glyph Toys. Mentre e'
+          selezionato mostra l'ora; se in quel momento una sveglia sta suonando, il
+          pulsante posticipa (pressione breve) o spegne (pressione lunga) al posto
+          dei tasti fisici del telefono.
+        -->
+        <service
+            android:name=".glyph.NoAlarmGlyphToyService"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="com.nothing.glyph.TOY" />
+            </intent-filter>
+            <meta-data android:name="com.nothing.glyph.toy.name" android:resource="@string/app_name" />
+            <meta-data android:name="com.nothing.glyph.toy.image" android:resource="@drawable/ic_launcher_foreground" />
+            <meta-data android:name="com.nothing.glyph.toy.summary" android:resource="@string/glyph_toy_summary" />
+            <meta-data android:name="com.nothing.glyph.toy.longpress" android:value="1" />
+        </service>
 
     </application>
 </manifest>

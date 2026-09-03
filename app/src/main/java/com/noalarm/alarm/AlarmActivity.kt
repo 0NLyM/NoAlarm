@@ -9,12 +9,13 @@ import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +64,7 @@ import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import kotlin.math.hypot
 
 /**
  * Schermata a tutto schermo mentre la sveglia suona. Oltre a spegni/posticipa
@@ -100,12 +102,6 @@ class AlarmActivity : ComponentActivity() {
                 LaunchedEffect(ringing) {
                     if (ringing == 0L && closing == null) closing = ClosingReason.Dismissed
                 }
-                LaunchedEffect(closing) {
-                    if (closing != null) {
-                        delay(1100)
-                        finishAndRemoveTask()
-                    }
-                }
 
                 Box(Modifier.fillMaxSize()) {
                     Ringing(
@@ -120,7 +116,7 @@ class AlarmActivity : ComponentActivity() {
                             AlarmService.dismiss(this@AlarmActivity)
                         },
                     )
-                    closing?.let { ClosingOverlay(it) }
+                    closing?.let { ClosingOverlay(it, onFinished = ::finishAndRemoveTask) }
                 }
             }
         }
@@ -219,7 +215,7 @@ private fun Ringing(
                     modifier = Modifier.size((Matrix.SIZE * 4).dp),
                     cell = 4.dp,
                     onColor = Color.White,
-                    offColor = Color(0xFF1A1A1A),
+                    offColor = Color.Black,
                     backgroundColor = Color.Black,
                 )
                 Spacer(Modifier.weight(0.5f))
@@ -299,21 +295,37 @@ private fun Ringing(
 }
 
 /**
- * Chiusura a schermo nero, come Google Clock: uno sfondo che sfuma e una
- * conferma al centro, poi l'activity si chiude da sola. Se la sveglia e'
- * stata posticipata mostra per quanto, cosi' non resta il dubbio se il tocco
- * sia andato a segno.
+ * Chiusura come Google Clock: un cerchio nero che si espande dal centro fino
+ * a coprire tutto lo schermo, la conferma, poi lo stesso cerchio si richiude
+ * verso il centro e l'activity si chiude da sola - il timing lo detta
+ * l'animazione stessa, non un ritardo fisso a parte. Se la sveglia e' stata
+ * posticipata mostra per quanto, cosi' non resta il dubbio se il tocco sia
+ * andato a segno.
  */
 @Composable
-private fun ClosingOverlay(reason: ClosingReason) {
-    val alpha = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { alpha.animateTo(1f, tween(280)) }
+private fun ClosingOverlay(reason: ClosingReason, onFinished: () -> Unit) {
+    val progress = remember { Animatable(0f) }     // 0 = invisibile, 1 = schermo coperto
+    val textAlpha = remember { Animatable(0f) }
 
-    Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = alpha.value)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (alpha.value > 0.6f) {
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(360, easing = FastOutSlowInEasing))
+        textAlpha.animateTo(1f, tween(160))
+        delay(650)
+        textAlpha.animateTo(0f, tween(140))
+        progress.animateTo(0f, tween(320, easing = FastOutSlowInEasing))
+        onFinished()
+    }
+
+    Canvas(Modifier.fillMaxSize()) {
+        val maxRadius = hypot(size.width, size.height) / 2f
+        drawCircle(Color.Black, radius = progress.value * maxRadius)
+    }
+
+    if (textAlpha.value > 0f) {
+        Box(
+            Modifier.fillMaxSize().alpha(textAlpha.value),
+            contentAlignment = Alignment.Center,
+        ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     if (reason is ClosingReason.Snoozed) Icons.Outlined.Snooze else Icons.Outlined.AlarmOff,

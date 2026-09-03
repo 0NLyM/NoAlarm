@@ -35,9 +35,12 @@ import kotlin.math.sqrt
  * esattamente cio' che suonera' sul retro del telefono - non serve un Nothing
  * Phone per vederlo, e' puro rendering di pixel, nessuna chiamata alla SDK.
  *
- * Lo sfondo di punti spenti e' ritagliato in un cerchio, come la matrice fisica
- * del Phone (3): fuori da quel cerchio non si disegna nulla, cosi' la forma
- * resta quella vera invece di un quadrato pieno di puntini.
+ * La griglia e' ritagliata in un cerchio, come la matrice fisica del Phone (3):
+ * fuori da quel cerchio non si disegna nulla. Per default lo sfondo del Canvas
+ * e' trasparente (si vede cio' che sta dietro, tipicamente la card) e i punti
+ * spenti sono neri, una texture sottile invece di un riquadro pieno; chi
+ * chiama puo' forzare altri colori, come fa la schermata di squillo per il
+ * bianco su nero.
  */
 @Composable
 fun GlyphStylePreview(
@@ -46,8 +49,8 @@ fun GlyphStylePreview(
     modifier: Modifier = Modifier,
     cell: Dp = 3.dp,
     onColor: Color = MaterialTheme.colorScheme.onBackground,
-    offColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    backgroundColor: Color = MaterialTheme.colorScheme.background,
+    offColor: Color = Color.Black,
+    backgroundColor: Color = Color.Transparent,
 ) {
     val settings by Store.settings.collectAsStateWithLifecycle()
     // 12 fps come sulla matrice vera, cosi' l'anteprima ha lo stesso ritmo.

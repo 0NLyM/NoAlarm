@@ -125,7 +125,7 @@ fun WorldClockScreen() {
 
         FloatingActionButton(
             onClick = { picking = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 104.dp),
             containerColor = MaterialTheme.colorScheme.secondary,
             contentColor = MaterialTheme.colorScheme.onSecondary,
         ) { Icon(Icons.Outlined.Add, "Aggiungi citta'") }

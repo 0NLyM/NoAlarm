@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.EventBusy
+import androidx.compose.material.icons.outlined.FiberManualRecord
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -92,6 +93,16 @@ fun CalendarScreen() {
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.labelLarge,
                     )
+                    DotIconButton(
+                        Icons.Outlined.FiberManualRecord,
+                        if (settings.showRepeatingDots) "Nascondi i pallini delle sveglie ripetute"
+                        else "Mostra i pallini delle sveglie ripetute",
+                        { Store.update { it.copy(showRepeatingDots = !it.showRepeatingDots) } },
+                        size = 40,
+                        contentColor = if (settings.showRepeatingDots) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.size(8.dp))
                     DotIconButton(Icons.Outlined.ChevronLeft, "Mese precedente",
                         { month = month.minusMonths(1) }, size = 40)
                     Spacer(Modifier.size(8.dp))
@@ -127,7 +138,8 @@ fun CalendarScreen() {
                                 inMonth = YearMonth.from(day) == month,
                                 isToday = day == today,
                                 isSelected = day == selected,
-                                count = ofDay[day]?.size ?: 0,
+                                alarms = ofDay[day].orEmpty(),
+                                showRepeatingDots = settings.showRepeatingDots,
                                 onClick = { selected = day },
                             )
                         }
@@ -188,7 +200,7 @@ fun CalendarScreen() {
                     autoSilenceMinutes = settings.defaultAutoSilenceMinutes,
                 )
             },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 104.dp),
             containerColor = MaterialTheme.colorScheme.secondary,
             contentColor = MaterialTheme.colorScheme.onSecondary,
         ) { Icon(Icons.Outlined.Add, "Nuova sveglia il ${Format.dateLabel(selected)}") }
@@ -203,7 +215,8 @@ private fun DayCell(
     inMonth: Boolean,
     isToday: Boolean,
     isSelected: Boolean,
-    count: Int,
+    alarms: List<Alarm>,
+    showRepeatingDots: Boolean,
     onClick: () -> Unit,
 ) = Box(
     Modifier
@@ -234,14 +247,17 @@ private fun DayCell(
         )
         Spacer(Modifier.height(3.dp))
         // Un punto per sveglia, fino a tre: la stessa grammatica del dot-matrix.
+        // Le ripetute sono rosse (si puo' nascondere), le singole seguono il tema.
+        val dots = alarms.filter { !it.repeating || showRepeatingDots }.take(3)
         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            repeat(count.coerceAtMost(3)) {
+            dots.forEach { alarm ->
                 Box(
                     Modifier
                         .size(4.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isSelected) MaterialTheme.colorScheme.onSecondary
+                            if (alarm.repeating) MaterialTheme.colorScheme.error
+                            else if (isSelected) MaterialTheme.colorScheme.onSecondary
                             else MaterialTheme.colorScheme.secondary
                         )
                 )

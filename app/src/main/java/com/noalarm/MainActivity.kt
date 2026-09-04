@@ -2,14 +2,18 @@ package com.noalarm
 
 import android.Manifest
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.AlarmClock
+import android.provider.Settings as AndroidSettings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Settings
@@ -32,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -49,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.noalarm.alarm.AlarmScheduler
 import com.noalarm.data.BarAppearance
 import com.noalarm.data.Store
 import com.noalarm.ui.AlarmScreen
@@ -75,6 +82,15 @@ class MainActivity : ComponentActivity() {
             NoAlarmTheme {
                 LaunchedEffect(Unit) {
                     if (Build.VERSION.SDK_INT >= 33) ask.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    // Senza questo permesso speciale le sveglie possono ritardare o non
+                    // suonare affatto: va chiesto subito, non solo se l'utente trova la riga
+                    // in Impostazioni.
+                    if (Build.VERSION.SDK_INT >= 31 && !AlarmScheduler.canScheduleExact(this@MainActivity)) {
+                        this@MainActivity.startActivity(
+                            Intent(AndroidSettings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                                .setData(Uri.parse("package:${this@MainActivity.packageName}"))
+                        )
+                    }
                 }
                 Home(pendingTab) { pendingTab = null }
             }
@@ -117,11 +133,11 @@ private val tabs = listOf(
 @Composable
 private fun Home(requestedTab: String?, onTabConsumed: () -> Unit) {
     var current by rememberSaveable { mutableStateOf(MainActivity.TAB_ALARM) }
-    var settings by rememberSaveable { mutableStateOf(false) }
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
     val s by Store.settings.collectAsStateWithLifecycle()
 
     LaunchedEffect(requestedTab) {
-        requestedTab?.let { current = it; settings = false; onTabConsumed() }
+        requestedTab?.let { current = it; settingsOpen = false; onTabConsumed() }
     }
 
     val tab = remember(current) { tabs.firstOrNull { it.key == current } ?: tabs[0] }
@@ -131,9 +147,9 @@ private fun Home(requestedTab: String?, onTabConsumed: () -> Unit) {
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text(if (settings) "IMPOSTAZIONI" else tab.title.uppercase(), style = MaterialTheme.typography.labelLarge) },
+                    title = { Text(tab.title.uppercase(), style = MaterialTheme.typography.labelLarge) },
                     actions = {
-                        IconButton(onClick = { settings = !settings }) {
+                        IconButton(onClick = { settingsOpen = true }) {
                             Icon(Icons.Outlined.Settings, "Impostazioni")
                         }
                     },
@@ -145,22 +161,46 @@ private fun Home(requestedTab: String?, onTabConsumed: () -> Unit) {
             },
         ) { inset ->
             Box(Modifier.fillMaxSize().padding(inset)) {
-                when {
-                    settings -> SettingsScreen()
-                    current == MainActivity.TAB_ALARM -> AlarmScreen()
-                    current == MainActivity.TAB_CLOCK -> WorldClockScreen()
-                    current == MainActivity.TAB_TIMER -> TimerScreen()
-                    current == MainActivity.TAB_STOPWATCH -> StopwatchScreen()
+                when (current) {
+                    MainActivity.TAB_ALARM -> AlarmScreen()
+                    MainActivity.TAB_CLOCK -> WorldClockScreen()
+                    MainActivity.TAB_TIMER -> TimerScreen()
+                    MainActivity.TAB_STOPWATCH -> StopwatchScreen()
                     else -> CalendarScreen()
                 }
             }
         }
         NothingBottomBar(
-            selected = if (settings) null else current,
+            selected = current,
             appearance = s.barAppearance,
-            onSelect = { current = it; settings = false },
+            onSelect = { current = it },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+
+        // Livello sopra a tutto, menu inferiore compreso: e' una schermata a se',
+        // non un tab, quindi Indietro la chiude invece di uscire dall'app.
+        if (settingsOpen) {
+            BackHandler { settingsOpen = false }
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Scaffold(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    topBar = {
+                        TopAppBar(
+                            title = { Text("IMPOSTAZIONI", style = MaterialTheme.typography.labelLarge) },
+                            navigationIcon = {
+                                IconButton(onClick = { settingsOpen = false }) {
+                                    Icon(Icons.Outlined.Close, "Chiudi")
+                                }
+                            },
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.background,
+                                titleContentColor = MaterialTheme.colorScheme.onBackground,
+                            ),
+                        )
+                    },
+                ) { inset -> Box(Modifier.fillMaxSize().padding(inset)) { SettingsScreen() } }
+            }
+        }
     }
 }
 
@@ -176,8 +216,11 @@ private fun NothingBottomBar(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val background = if (appearance == BarAppearance.BLUR)
-        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f)
+    val blur = appearance == BarAppearance.BLUR
+    // Un colore piu' chiaro e piu' trasparente, con un filo di bordo: a bassa
+    // opacita' su uno sfondo pieno una tinta identica non si distingueva da
+    // "solido" ne' leggeva come vetro, restava solo piu' slavata.
+    val background = if (blur) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f)
     else MaterialTheme.colorScheme.surfaceContainer
 
     Row(
@@ -186,6 +229,10 @@ private fun NothingBottomBar(
             .padding(horizontal = 20.dp, vertical = 12.dp)
             .clip(RoundedCornerShape(50))
             .background(background)
+            .let {
+                if (blur) it.border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(50))
+                else it
+            }
             .padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,

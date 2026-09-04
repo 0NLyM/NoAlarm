@@ -60,9 +60,10 @@ fun StopwatchScreen() {
                 )
             }
         }
-        // I comandi stanno in fondo, dove arriva il pollice.
+        // I comandi stanno in fondo, dove arriva il pollice: il margine sotto
+        // e' abbastanza largo da non finire sotto la pillola del menu.
         Row(
-            Modifier.padding(top = 16.dp, bottom = 24.dp),
+            Modifier.padding(top = 16.dp, bottom = 104.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

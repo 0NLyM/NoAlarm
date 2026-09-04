@@ -152,7 +152,7 @@ fun AlarmScreen() {
                     autoSilenceMinutes = settings.defaultAutoSilenceMinutes,
                 )
             },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 104.dp),
             containerColor = MaterialTheme.colorScheme.secondary,
             contentColor = MaterialTheme.colorScheme.onSecondary,
         ) { Icon(Icons.Outlined.Add, "Nuova sveglia") }

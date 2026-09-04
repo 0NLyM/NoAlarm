@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -177,26 +178,33 @@ fun NothingSwitch(
     else MaterialTheme.colorScheme.surfaceContainerHigh
     val thumbColor = if (checked) MaterialTheme.colorScheme.surface
     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-    val thumbOffset by animateDpAsState(if (checked) 20.dp else 0.dp, tween(150), label = "switch")
-    val alpha = (if (enabled) 1f else 0.4f) * (if (blur) 0.7f else 1f)
+    val thumbOffset by animateDpAsState(if (checked) 14.dp else 0.dp, tween(150), label = "switch")
+    val enabledAlpha = if (enabled) 1f else 0.4f
+    // Il pallino resta sempre pieno: e' il vetro del binario a farsi
+    // traslucido, non l'elemento che deve restare leggibile sopra di esso.
+    val trackAlpha = enabledAlpha * (if (blur) 0.55f else 1f)
 
     Box(
         modifier
-            .size(52.dp, 32.dp)
+            .size(46.dp, 32.dp)
             .clip(RoundedCornerShape(50))
-            .background(trackColor.copy(alpha = alpha))
+            .background(trackColor.copy(alpha = trackAlpha))
+            .let {
+                if (blur) it.border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f * enabledAlpha), RoundedCornerShape(50))
+                else it
+            }
             .let {
                 if (onCheckedChange != null) it.clickable(enabled = enabled) { onCheckedChange(!checked) }
                 else it
             }
-            .padding(4.dp),
+            .padding(3.dp),
     ) {
         Box(
             Modifier
                 .offset(x = thumbOffset)
-                .size(24.dp)
+                .size(26.dp)
                 .clip(RoundedCornerShape(50))
-                .background(thumbColor.copy(alpha = alpha)),
+                .background(thumbColor.copy(alpha = enabledAlpha)),
         )
     }
 }

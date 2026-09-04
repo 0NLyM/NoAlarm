@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -322,7 +323,8 @@ private fun ClosingOverlay(reason: ClosingReason, onFinished: () -> Unit) {
         progress.animateTo(1f, tween(650, easing = FastOutSlowInEasing))
         delay(650)
         textAlpha.animateTo(0f, tween(180))
-        hole.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
+        // Lineare, non accelera/decelera: l'uscita deve sentirsi come un taglio pulito.
+        hole.animateTo(1f, tween(600, easing = LinearEasing))
         onFinished()
     }
 

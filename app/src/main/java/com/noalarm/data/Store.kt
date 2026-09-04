@@ -192,6 +192,7 @@ object Store {
         put("bedtimeReminderMinutes", s.bedtimeReminderMinutes)
         put("barAppearance", s.barAppearance.name)
         put("fontFamily", s.fontFamily.name)
+        put("showRepeatingDots", s.showRepeatingDots)
     }
 
     private fun key(o: JSONObject, k: String, def: KeyAction) =
@@ -222,6 +223,7 @@ object Store {
             .getOrDefault(BarAppearance.SOLID),
         fontFamily = runCatching { AppFont.valueOf(o.optString("fontFamily", "SYSTEM")) }
             .getOrDefault(AppFont.SYSTEM),
+        showRepeatingDots = o.optBoolean("showRepeatingDots", true),
     )
 }
 

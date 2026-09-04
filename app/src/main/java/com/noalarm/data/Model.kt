@@ -143,6 +143,8 @@ data class Settings(
     val bedtimeReminderMinutes: Int = 30,
     val barAppearance: BarAppearance = BarAppearance.SOLID,
     val fontFamily: AppFont = AppFont.SYSTEM,
+    /** Pallino rosso nel calendario per i giorni con una sveglia ripetuta. */
+    val showRepeatingDots: Boolean = true,
 ) {
     fun dayOrder(): List<DayOfWeek> {
         val all = DayOfWeek.values().toList()

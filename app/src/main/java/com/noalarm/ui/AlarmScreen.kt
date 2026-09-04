@@ -59,6 +59,7 @@ import com.noalarm.alarm.AlarmScheduler
 import com.noalarm.data.Alarm
 import com.noalarm.data.GlyphStyle
 import com.noalarm.data.Store
+import kotlinx.coroutines.delay
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalTime
@@ -236,24 +237,77 @@ private fun BedtimeSheet(onDismiss: () -> Unit) = ModalBottomSheet(
     containerColor = MaterialTheme.colorScheme.background,
 ) { BedtimeScreen() }
 
-/** Foglio di modifica di una sveglia, condiviso con la schermata Calendario. */
+/**
+ * Foglio di modifica di una sveglia, condiviso con la schermata Calendario.
+ *
+ * Salva in tempo reale invece che solo al tocco di "Salva": chiudere il
+ * foglio in un modo qualunque - swipe compreso - non perde mai le modifiche.
+ * L'unico modo di perdere davvero la sveglia resta il pulsante Elimina, e
+ * anche li' per qualche secondo si puo' tornare indietro.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlarmEditSheet(alarm: Alarm, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val settings by Store.settings.collectAsStateWithLifecycle()
+    var current by remember(alarm.id) { mutableStateOf(alarm) }
+    var deleted by remember { mutableStateOf(false) }
+
+    fun commit(a: Alarm) = AlarmScheduler.save(context, a.copy(enabled = true, snoozedUntil = 0L))
+
+    // Ammortizzato: riprogrammare nel sistema non e' gratuito, non ha senso
+    // rifarlo a ogni singolo frame mentre si trascina il carosello dell'ora.
+    LaunchedEffect(current, deleted) {
+        if (deleted) return@LaunchedEffect
+        delay(400)
+        commit(current)
+    }
+
+    fun close() {
+        if (!deleted) commit(current)
+        onDismiss()
+    }
+
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = ::close,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.background,
     ) {
-        AlarmEditor(
-            alarm = alarm,
-            use24h = settings.use24h,
-            order = settings.dayOrder(),
-            onSave = { AlarmScheduler.save(context, it); onDismiss() },
-            onDelete = { AlarmScheduler.delete(context, alarm.id); onDismiss() },
-        )
+        if (deleted) {
+            DeletedNotice(
+                onUndo = { commit(current); onDismiss() },
+                onExpire = onDismiss,
+            )
+        } else {
+            AlarmEditor(
+                alarm = alarm,
+                use24h = settings.use24h,
+                order = settings.dayOrder(),
+                onDraftChange = { current = it },
+                onDone = ::close,
+                onDelete = {
+                    AlarmScheduler.delete(context, current.id)
+                    deleted = true
+                },
+            )
+        }
+    }
+}
+
+/** Conferma minimale dopo Elimina: qualche secondo per tornare indietro, poi si chiude da sola. */
+@Composable
+private fun DeletedNotice(onUndo: () -> Unit, onExpire: () -> Unit) {
+    LaunchedEffect(Unit) {
+        delay(4000)
+        onExpire()
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(24.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Sveglia eliminata", style = MaterialTheme.typography.bodyMedium)
+        TextButton(onClick = onUndo) { Text("ANNULLA") }
     }
 }
 
@@ -296,10 +350,12 @@ private fun AlarmEditor(
     alarm: Alarm,
     use24h: Boolean,
     order: List<DayOfWeek>,
-    onSave: (Alarm) -> Unit,
+    onDraftChange: (Alarm) -> Unit,
+    onDone: () -> Unit,
     onDelete: () -> Unit,
 ) {
     var draft by remember(alarm.id) { mutableStateOf(alarm) }
+    LaunchedEffect(draft) { onDraftChange(draft) }
 
     val ringtone = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == Activity.RESULT_OK) {
@@ -454,8 +510,8 @@ private fun AlarmEditor(
             )
             DotIconButton(
                 Icons.Outlined.Check,
-                "Salva",
-                { onSave(draft.copy(enabled = true, snoozedUntil = 0L)) },
+                "Fatto",
+                onDone,
                 size = 64,
                 color = MaterialTheme.colorScheme.secondary,
                 contentColor = MaterialTheme.colorScheme.onSecondary,

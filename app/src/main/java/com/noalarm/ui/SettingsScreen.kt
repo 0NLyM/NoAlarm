@@ -1,7 +1,6 @@
 package com.noalarm.ui
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings as AndroidSettings
 import androidx.compose.foundation.layout.Arrangement
@@ -141,12 +140,7 @@ fun SettingsScreen() {
             RowItem(
                 title = "Consenti sveglie esatte",
                 subtitle = "Senza questo permesso le sveglie possono ritardare",
-                onClick = {
-                    context.startActivity(
-                        Intent(AndroidSettings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-                            .setData(Uri.parse("package:${context.packageName}"))
-                    )
-                },
+                onClick = { context.startActivity(Intent(AndroidSettings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)) },
             )
         }
         RowItem(

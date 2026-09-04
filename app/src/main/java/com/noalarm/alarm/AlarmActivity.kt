@@ -1,5 +1,7 @@
 package com.noalarm.alarm
 
+import android.app.KeyguardManager
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
@@ -29,10 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.AlarmOff
 import androidx.compose.material.icons.outlined.Remove
-import androidx.compose.material.icons.outlined.Snooze
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,6 +49,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.noalarm.Format
@@ -315,16 +315,25 @@ private fun Ringing(
  */
 @Composable
 private fun ClosingOverlay(reason: ClosingReason, onFinished: () -> Unit) {
+    val context = LocalContext.current
+    // A schermo bloccato non c'e' niente di vero da rivelare sotto il foro: il
+    // sistema ripropone comunque la schermata di blocco (nessuna app puo'
+    // scavalcarla), e farla vedere attraverso un foro che si allarga sembra un
+    // errore. Meglio restare neri, come se lo schermo si fosse solo spento.
+    val locked = remember {
+        (context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager)
+            ?.isKeyguardLocked == true
+    }
     val progress = remember { Animatable(0f) }     // 0 = invisibile, 1 = schermo coperto
     val hole = remember { Animatable(0f) }          // 0 = nessun foro, 1 = foro a schermo intero
     val textAlpha = remember { Animatable(1f) }     // visibile fin dal primo frame
 
     LaunchedEffect(Unit) {
-        progress.animateTo(1f, tween(650, easing = FastOutSlowInEasing))
-        delay(650)
-        textAlpha.animateTo(0f, tween(180))
+        progress.animateTo(1f, tween(520, easing = FastOutSlowInEasing))
+        delay(480)
+        textAlpha.animateTo(0f, tween(150))
         // Lineare, non accelera/decelera: l'uscita deve sentirsi come un taglio pulito.
-        hole.animateTo(1f, tween(600, easing = LinearEasing))
+        if (!locked) hole.animateTo(1f, tween(460, easing = LinearEasing))
         onFinished()
     }
 
@@ -341,20 +350,11 @@ private fun ClosingOverlay(reason: ClosingReason, onFinished: () -> Unit) {
             Modifier.fillMaxSize().alpha(textAlpha.value),
             contentAlignment = Alignment.Center,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    if (reason is ClosingReason.Snoozed) Icons.Outlined.Snooze else Icons.Outlined.AlarmOff,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = Color.White,
-                )
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    if (reason is ClosingReason.Snoozed) "POSTICIPATA DI ${reason.minutes} MIN" else "SVEGLIA SPENTA",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White,
-                )
-            }
+            Text(
+                if (reason is ClosingReason.Snoozed) "POSTICIPATA DI ${reason.minutes} MIN" else "SVEGLIA SPENTA",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+            )
         }
     }
 }

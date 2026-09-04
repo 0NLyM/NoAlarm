@@ -63,6 +63,9 @@ fun WorldClockScreen() {
                         Modifier.fillMaxWidth().height(90.dp),
                         cell = if (settings.showSeconds) 8.dp else 12.dp,
                         color = MaterialTheme.colorScheme.onBackground,
+                        accentChars = setOf(':'),
+                        accentColor = MaterialTheme.colorScheme.secondary,
+                        blinkAccent = true,
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
@@ -92,6 +95,9 @@ fun WorldClockScreen() {
                                     Modifier.fillMaxWidth().height(60.dp),
                                     cell = 8.dp,
                                     color = MaterialTheme.colorScheme.onSurface,
+                                    accentChars = setOf(':'),
+                                    accentColor = MaterialTheme.colorScheme.secondary,
+                                    blinkAccent = true,
                                 )
                                 Spacer(Modifier.height(12.dp))
                                 Text(

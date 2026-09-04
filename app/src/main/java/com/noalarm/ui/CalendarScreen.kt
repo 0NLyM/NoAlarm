@@ -47,6 +47,7 @@ import com.noalarm.alarm.AlarmScheduler
 import com.noalarm.data.Alarm
 import com.noalarm.data.Store
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.YearMonth
 
 /**
@@ -193,8 +194,11 @@ fun CalendarScreen() {
 
         FloatingActionButton(
             onClick = {
+                val now = LocalTime.now()
                 editing = Alarm(
                     id = System.currentTimeMillis(),
+                    hour = now.hour,
+                    minute = now.minute,
                     dateEpochDay = selected.toEpochDay(),
                     snoozeMinutes = settings.defaultSnoozeMinutes,
                     autoSilenceMinutes = settings.defaultAutoSilenceMinutes,

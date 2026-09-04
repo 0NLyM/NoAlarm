@@ -11,6 +11,12 @@ enum class KeyAction { NONE, SNOOZE, DISMISS, VOLUME }
 /** Cosa disegna la Glyph Matrix mentre questa sveglia suona. */
 enum class GlyphStyle { CYCLE, CLOCK, BELL, LABEL, COUNTDOWN }
 
+/** Sfondo degli switch e del menu inferiore, in stile Nothing OS 5. */
+enum class BarAppearance { SOLID, BLUR }
+
+/** Carattere dei testi dell'app. DotText (le cifre) non ne risente: e' disegnato a mano. */
+enum class AppFont { SYSTEM, GEIST, INTER }
+
 data class Alarm(
     val id: Long,
     val hour: Int = 7,
@@ -135,6 +141,8 @@ data class Settings(
     val wakeMinute: Int = 0,
     val bedtimeDays: Set<Int> = setOf(1, 2, 3, 4, 5),
     val bedtimeReminderMinutes: Int = 30,
+    val barAppearance: BarAppearance = BarAppearance.SOLID,
+    val fontFamily: AppFont = AppFont.SYSTEM,
 ) {
     fun dayOrder(): List<DayOfWeek> {
         val all = DayOfWeek.values().toList()

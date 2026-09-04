@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.noalarm.BuildConfig
 import com.noalarm.alarm.AlarmScheduler
+import com.noalarm.data.AppFont
+import com.noalarm.data.BarAppearance
 import com.noalarm.data.KeyAction
 import com.noalarm.data.Store
 
@@ -33,6 +35,17 @@ private fun label(a: KeyAction) = when (a) {
     KeyAction.SNOOZE -> "Posticipa"
     KeyAction.DISMISS -> "Spegni"
     KeyAction.VOLUME -> "Volume"
+}
+
+private fun label(a: BarAppearance) = when (a) {
+    BarAppearance.SOLID -> "Solido"
+    BarAppearance.BLUR -> "Sfocato"
+}
+
+private fun label(f: AppFont) = when (f) {
+    AppFont.SYSTEM -> "Sistema"
+    AppFont.GEIST -> "Geist"
+    AppFont.INTER -> "Inter"
 }
 
 @Composable
@@ -103,6 +116,24 @@ fun SettingsScreen() {
             Modifier.padding(horizontal = 4.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        SectionLabel("Aspetto")
+        RowItem(
+            title = "Switch e menu inferiore",
+            subtitle = label(s.barAppearance),
+            onClick = {
+                val next = BarAppearance.entries[(s.barAppearance.ordinal + 1) % BarAppearance.entries.size]
+                Store.update { it.copy(barAppearance = next) }
+            },
+        )
+        RowItem(
+            title = "Carattere",
+            subtitle = label(s.fontFamily),
+            onClick = {
+                val next = AppFont.entries[(s.fontFamily.ordinal + 1) % AppFont.entries.size]
+                Store.update { it.copy(fontFamily = next) }
+            },
         )
 
         SectionLabel("Sistema")

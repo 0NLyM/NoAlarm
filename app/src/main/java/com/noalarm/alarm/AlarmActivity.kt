@@ -45,7 +45,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.graphicsLayer
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.noalarm.Format
@@ -103,7 +106,11 @@ class AlarmActivity : ComponentActivity() {
                     if (ringing == 0L && closing == null) closing = ClosingReason.Dismissed
                 }
 
-                Box(Modifier.fillMaxSize()) {
+                // compositingStrategy = Offscreen: serve perche' il "buco" trasparente
+                // disegnato da ClosingOverlay in chiusura possa bucare anche Ringing()
+                // sotto di se' (nella stessa finestra ora trasparente), invece di
+                // fermarsi al primo livello opaco e restare nero.
+                Box(Modifier.fillMaxSize().graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)) {
                     Ringing(
                         alarm = alarm,
                         onSnoozeChange = { snoozeMinutes = it },
@@ -296,29 +303,35 @@ private fun Ringing(
 
 /**
  * Chiusura come Google Clock: un cerchio nero che si espande dal centro fino
- * a coprire tutto lo schermo, la conferma, poi lo stesso cerchio si richiude
- * verso il centro e l'activity si chiude da sola - il timing lo detta
- * l'animazione stessa, non un ritardo fisso a parte. Se la sveglia e' stata
- * posticipata mostra per quanto, cosi' non resta il dubbio se il tocco sia
- * andato a segno.
+ * a coprire tutto lo schermo con la conferma gia' visibile, poi - invertito
+ * rispetto all'apertura - si allarga un foro che non scopre di nuovo questa
+ * schermata ma quello che c'e' davvero sotto la sveglia (l'app che stava
+ * girando prima, o la schermata di blocco): la finestra e' trasparente
+ * (Theme.NoAlarm.Ringing) apposta per questo, ClosingOverlay si limita a
+ * bucarla. Solo a foro completo l'activity si chiude, senza alcun taglio
+ * netto. Se la sveglia e' stata posticipata mostra per quanto, cosi' non
+ * resta il dubbio se il tocco sia andato a segno.
  */
 @Composable
 private fun ClosingOverlay(reason: ClosingReason, onFinished: () -> Unit) {
     val progress = remember { Animatable(0f) }     // 0 = invisibile, 1 = schermo coperto
-    val textAlpha = remember { Animatable(0f) }
+    val hole = remember { Animatable(0f) }          // 0 = nessun foro, 1 = foro a schermo intero
+    val textAlpha = remember { Animatable(1f) }     // visibile fin dal primo frame
 
     LaunchedEffect(Unit) {
         progress.animateTo(1f, tween(650, easing = FastOutSlowInEasing))
-        textAlpha.animateTo(1f, tween(200))
         delay(650)
         textAlpha.animateTo(0f, tween(180))
-        progress.animateTo(0f, tween(600, easing = FastOutSlowInEasing))
+        hole.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
         onFinished()
     }
 
     Canvas(Modifier.fillMaxSize()) {
         val maxRadius = hypot(size.width, size.height) / 2f
         drawCircle(Color.Black, radius = progress.value * maxRadius)
+        if (hole.value > 0f) {
+            drawCircle(Color.Black, radius = hole.value * maxRadius, blendMode = BlendMode.Clear)
+        }
     }
 
     if (textAlpha.value > 0f) {

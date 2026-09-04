@@ -37,8 +37,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -212,16 +210,12 @@ private fun BedtimeRow(onClick: () -> Unit) {
                     )
                 }
             }
-            Switch(
+            NothingSwitch(
                 checked = s.bedtimeEnabled,
                 onCheckedChange = { on ->
                     Store.update { it.copy(bedtimeEnabled = on) }
                     AlarmScheduler.scheduleBedtime(context)
                 },
-                colors = SwitchDefaults.colors(
-                    checkedTrackColor = MaterialTheme.colorScheme.secondary,
-                    checkedThumbColor = MaterialTheme.colorScheme.onSecondary,
-                ),
             )
         }
     }
@@ -286,14 +280,7 @@ private fun AlarmRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(
-            checked = alarm.enabled,
-            onCheckedChange = onToggle,
-            colors = SwitchDefaults.colors(
-                checkedTrackColor = MaterialTheme.colorScheme.secondary,
-                checkedThumbColor = MaterialTheme.colorScheme.onSecondary,
-            ),
-        )
+        NothingSwitch(checked = alarm.enabled, onCheckedChange = onToggle)
     }
 }
 
@@ -474,16 +461,7 @@ private fun AlarmEditor(
 fun SwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit) = RowItem(
     title = title,
     onClick = { onChange(!checked) },
-    trailing = {
-        Switch(
-            checked = checked,
-            onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(
-                checkedTrackColor = MaterialTheme.colorScheme.secondary,
-                checkedThumbColor = MaterialTheme.colorScheme.onSecondary,
-            ),
-        )
-    },
+    trailing = { NothingSwitch(checked = checked, onCheckedChange = onChange) },
 )
 
 @Composable

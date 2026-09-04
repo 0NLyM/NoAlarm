@@ -11,5 +11,12 @@
     <style name="Theme.NoAlarm.Ringing" parent="Theme.NoAlarm">
         <item name="android:windowShowWallpaper">false</item>
         <item name="android:windowAnimationStyle">@null</item>
+        <!-- Trasparente: la chiusura scopre con un cerchio cio' che c'e' davvero
+             dietro (l'app che stava girando prima della sveglia), non una copia
+             disegnata da noi. Finche' la sveglia suona il contenuto Compose resta
+             comunque opaco, quindi non si vede nulla in trasparenza fino a quel
+             momento. -->
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 </resources>

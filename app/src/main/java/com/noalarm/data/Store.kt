@@ -190,6 +190,8 @@ object Store {
         put("wakeHour", s.wakeHour); put("wakeMinute", s.wakeMinute)
         put("bedtimeDays", JSONArray(s.bedtimeDays.toList()))
         put("bedtimeReminderMinutes", s.bedtimeReminderMinutes)
+        put("barAppearance", s.barAppearance.name)
+        put("fontFamily", s.fontFamily.name)
     }
 
     private fun key(o: JSONObject, k: String, def: KeyAction) =
@@ -216,6 +218,10 @@ object Store {
         wakeHour = o.optInt("wakeHour", 7), wakeMinute = o.optInt("wakeMinute", 0),
         bedtimeDays = ints(o, "bedtimeDays").ifEmpty { setOf(1, 2, 3, 4, 5) },
         bedtimeReminderMinutes = o.optInt("bedtimeReminderMinutes", 30),
+        barAppearance = runCatching { BarAppearance.valueOf(o.optString("barAppearance", "SOLID")) }
+            .getOrDefault(BarAppearance.SOLID),
+        fontFamily = runCatching { AppFont.valueOf(o.optString("fontFamily", "SYSTEM")) }
+            .getOrDefault(AppFont.SYSTEM),
     )
 }
 

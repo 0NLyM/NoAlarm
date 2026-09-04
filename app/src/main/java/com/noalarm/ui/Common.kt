@@ -1,5 +1,7 @@
 package com.noalarm.ui
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -30,6 +33,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.noalarm.data.BarAppearance
+import com.noalarm.data.Store
 import kotlinx.coroutines.delay
 
 /** Orologio di sistema come stato Compose, aggiornato ogni [periodMs]. */
@@ -152,6 +158,47 @@ fun DotPillButton(
         color = if (enabled) contentColor else contentColor.copy(alpha = 0.4f),
         textAlign = TextAlign.Center,
     )
+}
+
+/**
+ * Interruttore in stile Nothing OS 5: pillola scura, il pallino si sposta e
+ * si accende di bianco - non il Material Switch di sistema, col suo bordo
+ * e la spunta al centro.
+ */
+@Composable
+fun NothingSwitch(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val blur = Store.settings.collectAsStateWithLifecycle().value.barAppearance == BarAppearance.BLUR
+    val trackColor = if (checked) MaterialTheme.colorScheme.onSurface
+    else MaterialTheme.colorScheme.surfaceContainerHigh
+    val thumbColor = if (checked) MaterialTheme.colorScheme.surface
+    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    val thumbOffset by animateDpAsState(if (checked) 20.dp else 0.dp, tween(150), label = "switch")
+    val alpha = (if (enabled) 1f else 0.4f) * (if (blur) 0.7f else 1f)
+
+    Box(
+        modifier
+            .size(52.dp, 32.dp)
+            .clip(RoundedCornerShape(50))
+            .background(trackColor.copy(alpha = alpha))
+            .let {
+                if (onCheckedChange != null) it.clickable(enabled = enabled) { onCheckedChange(!checked) }
+                else it
+            }
+            .padding(4.dp),
+    ) {
+        Box(
+            Modifier
+                .offset(x = thumbOffset)
+                .size(24.dp)
+                .clip(RoundedCornerShape(50))
+                .background(thumbColor.copy(alpha = alpha)),
+        )
+    }
 }
 
 @Composable

@@ -9,14 +9,20 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.noalarm.R
+import com.noalarm.data.AppFont
+import com.noalarm.data.Store
 
 // Palette Nothing: nero, bianco, un solo rosso.
 val NothingRed = Color(0xFFD71921)
@@ -72,35 +78,49 @@ private val Light = lightColorScheme(
     onError = Chalk,
 )
 
-// Nessun font custom: Nothing usa Ndot/Ntype, non ridistribuibili.
-// Il carattere "Nothing" lo da' il dot-matrix disegnato a mano (DotText).
-private val Type = Typography().let { t ->
-    val mono = FontFamily.Monospace
+// Il carattere "Nothing" lo da' soprattutto il dot-matrix disegnato a mano
+// (DotText, per le cifre): questa Typography copre il resto dei testi, e
+// segue il carattere scelto nelle impostazioni (Sistema, Geist o Inter).
+private val GeistFamily = FontFamily(Font(R.font.geist_variable))
+private val InterFamily = FontFamily(Font(R.font.inter_variable))
+
+private fun fontFamilyOf(font: AppFont) = when (font) {
+    AppFont.SYSTEM -> FontFamily.Default
+    AppFont.GEIST -> GeistFamily
+    AppFont.INTER -> InterFamily
+}
+
+private fun typography(family: FontFamily) = Typography().let { t ->
     t.copy(
-        displayLarge = t.displayLarge.copy(fontFamily = mono, letterSpacing = 2.sp),
-        headlineSmall = t.headlineSmall.copy(fontFamily = mono, letterSpacing = 1.sp),
-        titleMedium = t.titleMedium.copy(fontFamily = mono, letterSpacing = 1.sp),
+        displayLarge = t.displayLarge.copy(fontFamily = family, letterSpacing = 2.sp),
+        headlineSmall = t.headlineSmall.copy(fontFamily = family, letterSpacing = 1.sp),
+        titleMedium = t.titleMedium.copy(fontFamily = family, letterSpacing = 1.sp),
         labelLarge = TextStyle(
-            fontFamily = mono,
+            fontFamily = family,
             fontWeight = FontWeight.Medium,
             fontSize = 13.sp,
             letterSpacing = 2.sp,
         ),
-        labelMedium = TextStyle(fontFamily = mono, fontSize = 11.sp, letterSpacing = 1.5.sp),
-        bodyMedium = t.bodyMedium.copy(fontFamily = mono),
-        bodySmall = t.bodySmall.copy(fontFamily = mono, letterSpacing = 0.5.sp),
+        labelMedium = TextStyle(fontFamily = family, fontSize = 11.sp, letterSpacing = 1.5.sp),
+        bodyMedium = t.bodyMedium.copy(fontFamily = family),
+        bodySmall = t.bodySmall.copy(fontFamily = family, letterSpacing = 0.5.sp),
     )
 }
 
 @Composable
 fun NoAlarmTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val scheme = if (dark) Dark else Light
+    val settings by Store.settings.collectAsStateWithLifecycle()
     val view = LocalContext.current as? Activity
     if (view != null) SideEffect {
         WindowCompat.getInsetsController(view.window, view.window.decorView)
             .isAppearanceLightStatusBars = !dark
     }
     CompositionLocalProvider(LocalDotOff provides if (dark) DotOffDark else DotOffLight) {
-        MaterialTheme(colorScheme = scheme, typography = Type, content = content)
+        MaterialTheme(
+            colorScheme = scheme,
+            typography = typography(fontFamilyOf(settings.fontFamily)),
+            content = content,
+        )
     }
 }

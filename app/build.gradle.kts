@@ -101,4 +101,7 @@ dependencies {
 
     // Eco della sveglia sul watch WearOS abbinato, via Data Layer API.
     implementation(libs.play.services.wearable)
+    // play-services-wearable porta in transitiva un Fragment troppo vecchio
+    // per la lint di release (richiede >= 1.3.0): lo fissiamo esplicitamente.
+    implementation(libs.androidx.fragment.ktx)
 }

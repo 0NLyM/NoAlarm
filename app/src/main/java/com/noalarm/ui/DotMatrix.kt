@@ -18,7 +18,16 @@ import androidx.compose.ui.unit.Dp
 import com.noalarm.ui.theme.LocalDotOff
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.pow
+
+// Quanto lontano (in cifre) resta visibile un vicino nel rullo, e quanto
+// vicino al centro sta rispetto a un'intera altezza di cifra: gli stessi
+// due numeri controllano sia la sfumatura che la distanza di sovrapposizione,
+// per restare leggibili anche nelle finestre piu' basse (timer, orologio).
+private const val ROLL_MAX_DIST = 2.2f
+private const val ROLL_GAP = 0.6f
 
 /**
  * Testo dot-matrix: la stessa griglia di punti della Glyph Matrix, disegnata su Canvas.
@@ -99,13 +108,19 @@ fun DotText(
                         drawCircle(offColor, r, Offset(colX + x * p, oy + y * p))
                     }
                 }
-                val base = floor(rollValue).toInt()
-                val frac = rollValue - base
-                val outDigit = '0' + Math.floorMod(base, 10)
-                drawRollingDigit(outDigit, colX, oy - frac * DotFont.H * p, p, r, color, 1f - frac)
-                if (frac > 0.001f) {
-                    val inDigit = '0' + Math.floorMod(base + 1, 10)
-                    drawRollingDigit(inDigit, colX, oy + (1f - frac) * DotFont.H * p, p, r, color, frac)
+                // Contachilometri: la cifra attiva al centro, un accenno sfumato di
+                // quella prima e dopo sopra e sotto - lo stesso linguaggio del
+                // carosello a griglia del selettore dell'ora.
+                val lo = floor(rollValue).toInt() - 1
+                val hi = floor(rollValue).toInt() + 2
+                for (d in lo..hi) {
+                    val dist = abs(d - rollValue)
+                    if (dist > ROLL_MAX_DIST) continue
+                    val norm = (dist / ROLL_MAX_DIST).coerceAtMost(1f)
+                    val alpha = (1f - norm).pow(1.4f)
+                    val dotR = r * (1f - norm * 0.5f)
+                    val y = oy + (d - rollValue) * DotFont.H * p * ROLL_GAP
+                    drawRollingDigit('0' + Math.floorMod(d, 10), colX, y, p, dotR, color, alpha)
                 }
             } else {
                 for (y in 0 until DotFont.H) for (x in 0 until DotFont.W) {

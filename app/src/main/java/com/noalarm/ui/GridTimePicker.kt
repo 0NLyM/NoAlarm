@@ -22,11 +22,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +50,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -60,16 +68,13 @@ private val BASE_CELL = 6.2.dp
 private val ACTIVE_CELL = 8.2.dp
 private val BOX_SIZE = 148.dp
 
+// Quanto dura, in secondi, il lancio dopo il rilascio: la velocita' del dito
+// (px/s) viene proiettata per questo tempo per decidere quante celle scorrere.
+private const val FLING_SECONDS = 0.3f
+
 private fun wrapModF(v: Float, mod: Float): Float {
     val r = v % mod
     return if (r < 0f) r + mod else r
-}
-
-private fun shortestDelta(from: Float, to: Float, mod: Int): Float {
-    var d = (to - from) % mod
-    if (d > mod / 2f) d -= mod
-    if (d < -mod / 2f) d += mod
-    return d
 }
 
 /**
@@ -163,19 +168,29 @@ private fun GridField(
         while (c > 0 && !valid(r, c)) c--
         return c
     }
+    // Riga incompleta (le ore si fermano a 23): non avvolgere la colonna dentro
+    // il numero di celle valide di questa riga - salta a una cifra diversa da
+    // quella mostrata. Si ferma all'ultima colonna valida, come un bordo.
     fun wrapPos(r: Float, c: Float): Pair<Int, Int> {
         val wr = Math.floorMod(r.roundToInt(), rows)
         val maxC = maxColOf(wr)
-        val wc = Math.floorMod(c.roundToInt(), maxC + 1)
+        val wc = Math.floorMod(c.roundToInt(), cols).coerceAtMost(maxC)
         return wr to wc
     }
-    suspend fun snapTo(r: Float, c: Float) {
-        val (wr, wc) = wrapPos(r, c)
-        val targetR = dragR.value + shortestDelta(dragR.value, wr.toFloat(), rows)
-        val targetC = dragC.value + shortestDelta(dragC.value, wc.toFloat(), cols)
+
+    // L'animazione parte SEMPRE dal valore continuo passato (niente rientro nel
+    // percorso piu' breve): e' quello che fa scorrere davvero tante celle
+    // quante ne chiede il lancio, invece di limitarsi alla cifra piu' vicina.
+    suspend fun snapTo(targetR: Float, targetC: Float) {
+        val (wr, wc) = wrapPos(targetR, targetC)
+        // Se il bersaglio cade oltre l'ultima colonna valida di una riga
+        // incompleta, accorcia l'animazione fino a li' invece di continuare a
+        // scorrere su celle che non esistono (solo le ore hanno righe cosi').
+        val rawWc = Math.floorMod(targetC.roundToInt(), cols)
+        val adjTargetC = targetC - (rawWc - wc)
         coroutineScope {
             launch { dragR.animateTo(targetR, spring(dampingRatio = 1.09f, stiffness = 190f)) }
-            launch { dragC.animateTo(targetC, spring(dampingRatio = 1.09f, stiffness = 190f)) }
+            launch { dragC.animateTo(adjTargetC, spring(dampingRatio = 1.09f, stiffness = 190f)) }
         }
         val newValue = wr * 10 + wc
         if (newValue != lastReported) {
@@ -190,13 +205,13 @@ private fun GridField(
             .clip(RoundedCornerShape(20.dp))
             .pointerInput(rows, cols) {
                 var totalDrag = Offset.Zero
-                var velocity = Offset.Zero
                 var lastPos = Offset.Zero
+                val tracker = VelocityTracker()
                 detectDragGestures(
                     onDragStart = { offset ->
                         totalDrag = Offset.Zero
-                        velocity = Offset.Zero
                         lastPos = offset
+                        tracker.resetTracking()
                         scope.launch { press.animateTo(0.86f, spring(dampingRatio = 0.8f, stiffness = 300f)) }
                     },
                     onDragEnd = {
@@ -208,10 +223,13 @@ private fun GridField(
                                 val localY = lastPos.y - boxPx / 2f
                                 snapTo(dragR.value + localY / step, dragC.value + localX / step)
                             } else {
-                                // un filo di inerzia dal gesto, proiettando qualche fotogramma avanti.
+                                // Velocita' vera del gesto (px/s), non solo l'ultimo fotogramma:
+                                // uno swipe veloce che rallenta un attimo prima del rilascio -
+                                // frequente al distacco del dito - non deve sembrare uno swipe lento.
+                                val velocity = tracker.calculateVelocity()
                                 snapTo(
-                                    dragR.value + (velocity.y / step) * 6f,
-                                    dragC.value + (velocity.x / step) * 6f,
+                                    dragR.value - (velocity.y * FLING_SECONDS) / step,
+                                    dragC.value - (velocity.x * FLING_SECONDS) / step,
                                 )
                             }
                         }
@@ -223,7 +241,7 @@ private fun GridField(
                     change.consume()
                     totalDrag += dragAmount
                     lastPos = change.position
-                    velocity = dragAmount
+                    tracker.addPointerInputChange(change)
                     scope.launch {
                         dragR.snapTo(wrapModF(dragR.value - dragAmount.y / step, rows.toFloat()))
                         dragC.snapTo(wrapModF(dragC.value - dragAmount.x / step, cols.toFloat()))
@@ -243,8 +261,11 @@ private fun GridField(
                 val rawR = rc + dr
                 val rawC = cc + dc
                 val r = Math.floorMod(rawR, rows)
-                val maxC = maxColOf(r)
-                val c = Math.floorMod(rawC, maxC + 1)
+                // Colonna sul modulo globale, non su quello (piu' corto) della riga:
+                // altrimenti le cifre di una riga incompleta (le ore oltre 23) si
+                // ripetono ogni poche colonne invece che ogni dieci, disallineando
+                // il numero disegnato da quello davvero sotto al dito.
+                val c = Math.floorMod(rawC, cols)
                 if (!valid(r, c)) continue
                 val ddr = rawR - dragR.value
                 val ddc = rawC - dragC.value
@@ -299,6 +320,9 @@ fun GridTimePickerPopup(
     onDismiss: () -> Unit,
 ) {
     val visible = remember { MutableTransitionState(false) }
+    // L'ora con cui si e' aperto il popup: la X la ripristina, tutto il resto
+    // (segno di spunta, tocco fuori, tasto indietro) tiene quella scelta.
+    val initial = remember { hour to minute }
     LaunchedEffect(Unit) { visible.targetState = true }
     LaunchedEffect(visible.currentState, visible.isIdle) {
         if (!visible.currentState && visible.isIdle) onDismiss()
@@ -329,18 +353,22 @@ fun GridTimePickerPopup(
             ) {
                 Surface(shape = RoundedCornerShape(30.dp), color = Color.Black) {
                     Column(
-                        Modifier.padding(vertical = 28.dp, horizontal = 20.dp),
+                        Modifier.padding(vertical = 24.dp, horizontal = 20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Box(
-                            Modifier
-                                .width(36.dp)
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(Color(0xFF1A1A1A)),
-                        )
-                        Spacer(Modifier.height(20.dp))
                         GridTimePicker(hour = hour, minute = minute, onChange = onChange)
+                        Spacer(Modifier.height(12.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            IconButton(onClick = {
+                                onChange(initial.first, initial.second)
+                                visible.targetState = false
+                            }) {
+                                Icon(Icons.Outlined.Close, "Annulla, non salvare l'ora", tint = MaterialTheme.colorScheme.error)
+                            }
+                            IconButton(onClick = { visible.targetState = false }) {
+                                Icon(Icons.Outlined.Check, "Conferma l'ora", tint = Color.White)
+                            }
+                        }
                     }
                 }
             }

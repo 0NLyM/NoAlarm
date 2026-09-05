@@ -100,7 +100,9 @@ private fun TimerCard(t: TimerItem, now: Long) {
             Spacer(Modifier.height(8.dp))
             DotText(
                 Format.timer(left.coerceAtLeast(0)),
-                Modifier.fillMaxWidth().height(64.dp),
+                // Piu' alta del semplice testo: lascia spazio alle cifre adiacenti
+                // sfumate sopra e sotto, come nel carosello del selettore dell'ora.
+                Modifier.fillMaxWidth().height(96.dp),
                 cell = 8.dp,
                 color = MaterialTheme.colorScheme.onSurface,
                 animateChanges = true,

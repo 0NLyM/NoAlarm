@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -37,13 +38,19 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,6 +79,7 @@ fun AlarmScreen() {
     val settings by Store.settings.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Alarm?>(null) }
     var bedtime by remember { mutableStateOf(false) }
+    var recentlyDeleted by remember { mutableStateOf<Alarm?>(null) }
     val tick = rememberNow(30_000L)
 
     // Una sveglia a data singola gia' passata non ha piu' senso: si spegne da sola.
@@ -162,13 +170,71 @@ fun AlarmScreen() {
                 )
             },
             modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 104.dp),
+            shape = CircleShape,
             containerColor = MaterialTheme.colorScheme.secondary,
             contentColor = MaterialTheme.colorScheme.onSecondary,
         ) { Icon(Icons.Outlined.Add, "Nuova sveglia") }
+
+        // Fuori dal foglio di modifica, che nel frattempo si e' gia' chiuso:
+        // si puo' continuare a usare il resto della schermata mentre e' visibile.
+        recentlyDeleted?.let { alarm ->
+            Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp).padding(bottom = 176.dp)) {
+                UndoBar(
+                    alarm = alarm,
+                    onUndo = {
+                        AlarmScheduler.save(context, alarm.copy(enabled = true, snoozedUntil = 0L))
+                        recentlyDeleted = null
+                    },
+                    onExpire = { recentlyDeleted = null },
+                )
+            }
+        }
     }
 
-    editing?.let { AlarmEditSheet(it) { editing = null } }
+    editing?.let {
+        AlarmEditSheet(
+            alarm = it,
+            onDismiss = { editing = null },
+            onDeleted = { deleted -> recentlyDeleted = deleted },
+        )
+    }
     if (bedtime) BedtimeSheet { bedtime = false }
+}
+
+/**
+ * Conferma minimale dopo Elimina: qualche secondo per tornare indietro, poi si
+ * chiude da sola. Riusata anche da CalendarScreen, che elimina sveglie allo
+ * stesso modo.
+ */
+@Composable
+fun UndoBar(alarm: Alarm, onUndo: () -> Unit, onExpire: () -> Unit) {
+    val progress = remember(alarm.id) { Animatable(1f) }
+    LaunchedEffect(alarm.id) {
+        progress.animateTo(0f, tween(4000, easing = LinearEasing))
+        onExpire()
+    }
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Sveglia eliminata", style = MaterialTheme.typography.bodyMedium)
+                TextButton(onClick = onUndo) { Text("ANNULLA") }
+            }
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { progress.value },
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.secondary,
+                trackColor = MaterialTheme.colorScheme.outline,
+            )
+        }
+    }
 }
 
 /**
@@ -248,24 +314,25 @@ private fun BedtimeSheet(onDismiss: () -> Unit) = ModalBottomSheet(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlarmEditSheet(alarm: Alarm, onDismiss: () -> Unit) {
+fun AlarmEditSheet(alarm: Alarm, onDismiss: () -> Unit, onDeleted: (Alarm) -> Unit) {
     val context = LocalContext.current
     val settings by Store.settings.collectAsStateWithLifecycle()
     var current by remember(alarm.id) { mutableStateOf(alarm) }
-    var deleted by remember { mutableStateOf(false) }
 
     fun commit(a: Alarm) = AlarmScheduler.save(context, a.copy(enabled = true, snoozedUntil = 0L))
 
     // Ammortizzato: riprogrammare nel sistema non e' gratuito, non ha senso
     // rifarlo a ogni singolo frame mentre si trascina il carosello dell'ora.
-    LaunchedEffect(current, deleted) {
-        if (deleted) return@LaunchedEffect
+    // Finche' non si tocca nulla "current" resta uguale ad "alarm": aprire il
+    // foglio con "+" non deve gia' salvare/programmare una sveglia di default.
+    LaunchedEffect(current) {
+        if (current == alarm) return@LaunchedEffect
         delay(400)
         commit(current)
     }
 
     fun close() {
-        if (!deleted) commit(current)
+        commit(current)
         onDismiss()
     }
 
@@ -274,41 +341,18 @@ fun AlarmEditSheet(alarm: Alarm, onDismiss: () -> Unit) {
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.background,
     ) {
-        if (deleted) {
-            DeletedNotice(
-                onUndo = { commit(current); onDismiss() },
-                onExpire = onDismiss,
-            )
-        } else {
-            AlarmEditor(
-                alarm = alarm,
-                use24h = settings.use24h,
-                order = settings.dayOrder(),
-                onDraftChange = { current = it },
-                onDone = ::close,
-                onDelete = {
-                    AlarmScheduler.delete(context, current.id)
-                    deleted = true
-                },
-            )
-        }
-    }
-}
-
-/** Conferma minimale dopo Elimina: qualche secondo per tornare indietro, poi si chiude da sola. */
-@Composable
-private fun DeletedNotice(onUndo: () -> Unit, onExpire: () -> Unit) {
-    LaunchedEffect(Unit) {
-        delay(4000)
-        onExpire()
-    }
-    Row(
-        Modifier.fillMaxWidth().padding(24.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Sveglia eliminata", style = MaterialTheme.typography.bodyMedium)
-        TextButton(onClick = onUndo) { Text("ANNULLA") }
+        AlarmEditor(
+            alarm = alarm,
+            use24h = settings.use24h,
+            order = settings.dayOrder(),
+            onDraftChange = { current = it },
+            onDone = ::close,
+            onDelete = {
+                AlarmScheduler.delete(context, current.id)
+                onDeleted(current)
+                onDismiss()
+            },
+        )
     }
 }
 

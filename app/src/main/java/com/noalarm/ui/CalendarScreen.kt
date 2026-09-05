@@ -65,6 +65,7 @@ fun CalendarScreen() {
     var month by remember { mutableStateOf(YearMonth.from(today)) }
     var selected by remember { mutableStateOf(today) }
     var editing by remember { mutableStateOf<Alarm?>(null) }
+    var recentlyDeleted by remember { mutableStateOf<Alarm?>(null) }
 
     val order = settings.dayOrder()
     // Le 42 celle della griglia, dal lunedi' (o domenica) che precede il primo del mese.
@@ -205,12 +206,32 @@ fun CalendarScreen() {
                 )
             },
             modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 104.dp),
+            shape = CircleShape,
             containerColor = MaterialTheme.colorScheme.secondary,
             contentColor = MaterialTheme.colorScheme.onSecondary,
         ) { Icon(Icons.Outlined.Add, "Nuova sveglia il ${Format.dateLabel(selected)}") }
+
+        recentlyDeleted?.let { alarm ->
+            Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp).padding(bottom = 176.dp)) {
+                UndoBar(
+                    alarm = alarm,
+                    onUndo = {
+                        AlarmScheduler.save(context, alarm.copy(enabled = true, snoozedUntil = 0L))
+                        recentlyDeleted = null
+                    },
+                    onExpire = { recentlyDeleted = null },
+                )
+            }
+        }
     }
 
-    editing?.let { AlarmEditSheet(it) { editing = null } }
+    editing?.let {
+        AlarmEditSheet(
+            alarm = it,
+            onDismiss = { editing = null },
+            onDeleted = { deleted -> recentlyDeleted = deleted },
+        )
+    }
 }
 
 @Composable

@@ -88,6 +88,16 @@
                 android:value="Timer e cronometro visibili nella notifica persistente" />
         </service>
 
+        <!-- Riceve dal watch WearOS abbinato lo spegni/posticipa dell'eco della sveglia. -->
+        <service
+            android:name=".wear.PhoneWearService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/noalarm" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".alarm.AlarmReceiver"
             android:exported="false" />

@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "NoAlarm"
 include(":app")
+include(":wear")

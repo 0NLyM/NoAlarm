@@ -98,4 +98,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
+
+    // Eco della sveglia sul watch WearOS abbinato, via Data Layer API.
+    implementation(libs.play.services.wearable)
 }

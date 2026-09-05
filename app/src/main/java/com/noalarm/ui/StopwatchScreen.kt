@@ -42,6 +42,7 @@ fun StopwatchScreen() {
             Modifier.fillMaxWidth().height(80.dp),
             cell = 8.dp,
             color = MaterialTheme.colorScheme.onBackground,
+            animateChanges = true,
         )
         Spacer(Modifier.height(24.dp))
         LazyColumn(

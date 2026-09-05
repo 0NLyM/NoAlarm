@@ -66,6 +66,7 @@ fun WorldClockScreen() {
                         accentChars = setOf(':'),
                         accentColor = MaterialTheme.colorScheme.secondary,
                         blinkAccent = true,
+                        animateChanges = true,
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
@@ -98,6 +99,7 @@ fun WorldClockScreen() {
                                     accentChars = setOf(':'),
                                     accentColor = MaterialTheme.colorScheme.secondary,
                                     blinkAccent = true,
+                                    animateChanges = true,
                                 )
                                 Spacer(Modifier.height(12.dp))
                                 Text(

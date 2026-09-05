@@ -103,6 +103,7 @@ private fun TimerCard(t: TimerItem, now: Long) {
                 Modifier.fillMaxWidth().height(64.dp),
                 cell = 8.dp,
                 color = MaterialTheme.colorScheme.onSurface,
+                animateChanges = true,
             )
             Spacer(Modifier.height(12.dp))
             LinearProgressIndicator(

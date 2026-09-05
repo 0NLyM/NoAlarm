@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -374,13 +375,42 @@ private fun AlarmEditor(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            DotTimePicker(
-                hour = draft.hour,
-                minute = draft.minute,
-                use24h = use24h,
-                onChange = { h, m -> draft = draft.copy(hour = h, minute = m) },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            )
+            // Il selettore a griglia sostituisce il rullo verticale solo in 24h: le
+            // ore 1..12 + AM/PM non si prestano alla stessa griglia decina/unita'.
+            // DotTimePicker resta nel codice apposta per questo caso, non e' stato
+            // buttato.
+            if (use24h) {
+                var pickerOpen by remember { mutableStateOf(false) }
+                DotText(
+                    Format.hhmm(draft.hour, draft.minute, true),
+                    Modifier
+                        .fillMaxWidth()
+                        .height(72.dp)
+                        .padding(vertical = 8.dp)
+                        .clickable { pickerOpen = true },
+                    cell = 9.dp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    accentChars = setOf(':'),
+                    accentColor = MaterialTheme.colorScheme.secondary,
+                    blinkAccent = true,
+                )
+                if (pickerOpen) {
+                    GridTimePickerPopup(
+                        hour = draft.hour,
+                        minute = draft.minute,
+                        onChange = { h, m -> draft = draft.copy(hour = h, minute = m) },
+                        onDismiss = { pickerOpen = false },
+                    )
+                }
+            } else {
+                DotTimePicker(
+                    hour = draft.hour,
+                    minute = draft.minute,
+                    use24h = use24h,
+                    onChange = { h, m -> draft = draft.copy(hour = h, minute = m) },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                )
+            }
 
             if (draft.onDate) {
                 RowItem(

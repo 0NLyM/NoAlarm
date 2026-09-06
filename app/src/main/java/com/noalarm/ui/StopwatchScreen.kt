@@ -46,11 +46,14 @@ fun StopwatchScreen() {
             shown,
             // Piu' alta: i numeri sfumati sopra e sotto hanno il loro spazio
             // invece di finire addosso al resto.
-            Modifier.fillMaxWidth().height(104.dp),
+            Modifier.fillMaxWidth().height(126.dp),
             cell = 8.dp,
             color = MaterialTheme.colorScheme.onBackground,
             animateChanges = true,
             groupMods = stopwatchMods(shown),
+            // Azzerato: anche secondi e centesimi tornano a zero scorrendo,
+            // invece di saltarci di colpo come fanno mentre corrono.
+            forceRoll = !sw.running && elapsed == 0L,
         )
         Spacer(Modifier.height(24.dp))
         LazyColumn(

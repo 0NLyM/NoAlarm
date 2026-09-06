@@ -26,12 +26,19 @@ import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
 /** Quanto lontano (in numeri) resta visibile un vicino del rullo. */
 private const val ROLL_MAX_DIST = 2.2f
 
 /** Distanza fra un numero e il successivo, in altezze di cifra. */
-private const val ROLL_GAP = 0.9f
+private const val ROLL_GAP = 0.75f
+
+/** Quanto rimpicciolisce un numero per ogni passo di distanza: e' la profondita'. */
+private const val ROLL_DEPTH = 0.42f
+
+/** Quanto la fascia a piena intensita' sconfina verso i vicini, prima di sfumare. */
+private const val ROLL_FADE = 0.25f
 
 /**
  * Sotto questo intervallo fra due cambi il gruppo salta invece di scorrere:
@@ -90,6 +97,11 @@ private fun nearestCongruent(current: Float, value: Int, mod: Int): Float =
  * [groupMods] e' il modulo di ogni gruppo da sinistra - 24, 60, 60 per un
  * orologio - e serve solo a sapere quale numero mostrare sfumato sopra e sotto
  * quello attivo. Senza, si assume 10^cifre.
+ *
+ * [forceRoll] fa scorrere anche i cambi che di norma saltano - quelli troppo
+ * rapidi da leggere e i salti lunghi. Serve a chi sa che il prossimo cambio e'
+ * voluto e non un ticchettio: un azzeramento, o la sveglia in programma che
+ * cambia.
  */
 @Composable
 fun DotText(
@@ -104,7 +116,7 @@ fun DotText(
     blinkAccent: Boolean = false,
     animateChanges: Boolean = false,
     groupMods: List<Int> = emptyList(),
-    maxRollSteps: Float = 1.5f,
+    forceRoll: Boolean = false,
 ) {
     val cols = DotFont.width(text, tracking)
     val blinkOn = if (blinkAccent) rememberNow(1000L) / 1000 % 2 == 0L else true
@@ -133,8 +145,9 @@ fun DotText(
                 // l'animazione precedente viene interrotta a meta', il rullo
                 // si ferma sempre esattamente su un numero, allineato agli altri.
                 val target = nearestCongruent(rolls[i].value, to, g.mod)
-                val jump = abs(target - rolls[i].value) > maxRollSteps ||
-                    now - lastChange[i] < ROLL_FAST_MS
+                val jump = !forceRoll && (
+                    abs(target - rolls[i].value) > 1.5f || now - lastChange[i] < ROLL_FAST_MS
+                    )
                 lastChange[i] = now
                 scope.launch {
                     if (jump) {
@@ -185,35 +198,48 @@ fun DotText(
         }
 
         if (!rolling) return@Canvas
+        val cy = size.height / 2f
+        val rowSpacing = DotFont.H * p * ROLL_GAP
         groups.forEachIndexed { gi, g ->
             val v = rolls[gi].value
             val base = floor(v).toInt()
+            // Centro del gruppo: i numeri rimpiccioliti restano incolonnati qui.
+            val localCenter = ((g.len - 1) * step + DotFont.W - 1) / 2f
+            val groupCx = ox + (g.start * step + localCenter) * p
             for (d in base - 1..base + 2) {
-                val dist = abs(d - v)
+                val rel = d - v
+                val dist = abs(rel)
                 if (dist > ROLL_MAX_DIST) continue
                 val norm = (dist / ROLL_MAX_DIST).coerceAtMost(1f)
                 val alpha = (1f - norm).pow(1.9f)
                 if (alpha <= 0.02f) continue
-                val dotR = r * (1f - norm * 0.6f)
-                val y = oy + (d - v) * DotFont.H * p * ROLL_GAP
+                // Prospettiva: rimpicciolisce il numero intero - passo fra i punti
+                // e raggio insieme - non solo i suoi punti, altrimenti resta
+                // grande uguale e sembra soltanto piu' sottile. Le file lontane
+                // si stringono un po' fra loro, come una ruota che si allontana.
+                val scale = 1f / (1f + dist * ROLL_DEPTH)
+                val pd = p * scale
+                val yc = cy + sign(rel) * dist.pow(0.85f) * rowSpacing
                 val s = Math.floorMod(d, g.mod).toString().padStart(g.len, '0')
                 val c = color.copy(alpha = color.alpha * alpha)
                 for (j in 0 until g.len) {
                     val glyph = s.getOrElse(j) { '0' }
-                    val colX = ox + (g.start + j) * step * p
                     for (yy in 0 until DotFont.H) for (xx in 0 until DotFont.W) {
-                        if (DotFont.on(glyph, xx, yy)) drawCircle(c, dotR, Offset(colX + xx * p, y + yy * p))
+                        if (!DotFont.on(glyph, xx, yy)) continue
+                        val gx = groupCx + (j * step + xx - localCenter) * pd
+                        val gy = yc + (yy - (DotFont.H - 1) / 2f) * pd
+                        drawCircle(c, r * scale, Offset(gx, gy))
                     }
                 }
             }
         }
 
         // I numeri di sfondo svaniscono verso i bordi invece di essere tagliati
-        // di netto. La fascia piena copre esattamente il numero attivo, che
-        // resta sempre a piena intensita'.
-        val half = DotFont.H * p / 2f
-        val top = ((size.height / 2f - half - r) / size.height).coerceIn(0f, 1f)
-        val bottom = ((size.height / 2f + half + r) / size.height).coerceIn(top, 1f)
+        // di netto. La fascia piena copre il numero attivo e un pezzo di strada
+        // verso i vicini, cosi' se ne vede una parte prima che sfumino.
+        val bandHalf = DotFont.H * p / 2f + r + ROLL_FADE * rowSpacing
+        val top = ((cy - bandHalf) / size.height).coerceIn(0f, 1f)
+        val bottom = ((cy + bandHalf) / size.height).coerceIn(top, 1f)
         drawRect(
             brush = Brush.verticalGradient(
                 0f to Color.Transparent,

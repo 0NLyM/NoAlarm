@@ -93,7 +93,10 @@ private fun timerMods(text: String): List<Int> =
 @Composable
 private fun TimerCard(t: TimerItem, now: Long) {
     val context = LocalContext.current
-    val left = t.remaining(now)
+    // now serve a far ricomporre la card, ma il residuo si legge sull'orologio
+    // vero: con il tick in ritardo, appena avviato il timer mostrava un secondo
+    // in piu' prima di iniziare a scendere.
+    val left = t.remaining(maxOf(now, System.currentTimeMillis()))
     val shown = Format.timer(left.coerceAtLeast(0))
     Panel {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -109,11 +112,13 @@ private fun TimerCard(t: TimerItem, now: Long) {
                 // Piu' alta del semplice testo: lascia spazio alle cifre adiacenti
                 // sfumate sopra e sotto senza finire addosso a quello che sta
                 // sopra e sotto la finestra.
-                Modifier.fillMaxWidth().height(124.dp),
+                Modifier.fillMaxWidth().height(146.dp),
                 cell = 8.dp,
                 color = MaterialTheme.colorScheme.onSurface,
                 animateChanges = true,
                 groupMods = timerMods(shown),
+                // Riportato al tempo pieno: i numeri ci risalgono scorrendo.
+                forceRoll = !t.running && left == t.totalMs,
             )
             Spacer(Modifier.height(12.dp))
             LinearProgressIndicator(

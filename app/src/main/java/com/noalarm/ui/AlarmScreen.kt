@@ -109,7 +109,7 @@ fun AlarmScreen() {
                         Spacer(Modifier.height(12.dp))
                         DotText(
                             Format.hhmm(next.first.hour, next.first.minute, settings.use24h),
-                            Modifier.fillMaxWidth().height(110.dp),
+                            Modifier.fillMaxWidth().height(140.dp),
                             cell = 11.dp,
                             color = MaterialTheme.colorScheme.onBackground,
                             animateChanges = true,
@@ -119,7 +119,7 @@ fun AlarmScreen() {
                             // Qui l'ora non ticchetta, cambia solo quando cambia
                             // la sveglia in programma: qualunque salto va scorso
                             // per intero invece di comparire di colpo.
-                            maxRollSteps = 99f,
+                            forceRoll = true,
                         )
                     }
                 }

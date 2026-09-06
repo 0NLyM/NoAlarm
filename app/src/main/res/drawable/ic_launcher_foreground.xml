@@ -1,43 +1,47 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Tutto scalato al 72% attorno al centro (54,54): a piena misura le
+         tacche e la nocca arrivavano a distanza 43/35.5 dal centro, oltre
+         il raggio di sicurezza di 33 dell'icona adattiva - i launcher con
+         maschera circolare le tagliavano. -->
     <path
         android:fillColor="#0A0A0A"
         android:pathData="
-            M47.4,23.5
-            Q54,19.5 60.6,23.5
-            C65,23.5 73.2,33 73.2,42
-            L73.2,54
-            C73.2,61 78,63 81.7,67.1
-            L81.7,71.1
-            L26.3,71.1
-            L26.3,67.1
-            C30,63 34.8,61 34.8,54
-            L34.8,42
-            C34.8,33 43,23.5 47.4,23.5
+            M49.25,32.04
+            Q54,29.16 58.75,32.04
+            C61.92,32.04 67.82,38.88 67.82,45.36
+            L67.82,54
+            C67.82,59.04 71.28,60.48 73.94,63.43
+            L73.94,66.31
+            L34.06,66.31
+            L34.06,63.43
+            C36.72,60.48 40.18,59.04 40.18,54
+            L40.18,45.36
+            C40.18,38.88 46.08,32.04 49.25,32.04
             Z" />
     <path
         android:fillColor="#0A0A0A"
         android:pathData="
-            M49,23.5
-            A5,5 0 1,0 59,23.5
-            A5,5 0 1,0 49,23.5
+            M50.4,32.04
+            A3.6,3.6 0 1,0 57.6,32.04
+            A3.6,3.6 0 1,0 50.4,32.04
             Z" />
     <path
         android:strokeColor="#0A0A0A"
-        android:strokeWidth="5"
+        android:strokeWidth="3.6"
         android:strokeLineCap="round"
-        android:pathData="M38,14 C31.37,14 26,19.37 26,26" />
+        android:pathData="M42.48,25.2 C37.71,25.2 33.84,29.07 33.84,33.84" />
     <path
         android:strokeColor="#0A0A0A"
-        android:strokeWidth="5"
+        android:strokeWidth="3.6"
         android:strokeLineCap="round"
-        android:pathData="M70,14 C76.63,14 82,19.37 82,26" />
+        android:pathData="M65.52,25.2 C70.29,25.2 74.16,29.07 74.16,33.84" />
     <path
         android:fillColor="#D71921"
         android:pathData="
-            M47.5,80
-            A6.5,6.5 0 1,0 60.5,80
-            A6.5,6.5 0 1,0 47.5,80
+            M49.32,72.72
+            A4.68,4.68 0 1,0 58.68,72.72
+            A4.68,4.68 0 1,0 49.32,72.72
             Z" />
 </vector>

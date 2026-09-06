@@ -28,6 +28,10 @@ import com.noalarm.Format
 import com.noalarm.clock.ClockService
 import com.noalarm.data.Store
 
+/** Il giro delle cifre del cronometro: minuti e secondi a 60, centesimi a 100. */
+private fun stopwatchMods(text: String): List<Int> =
+    if (text.count { it == ':' } == 2) listOf(100, 60, 60, 100) else listOf(60, 60, 100)
+
 @Composable
 fun StopwatchScreen() {
     val context = LocalContext.current
@@ -37,12 +41,16 @@ fun StopwatchScreen() {
 
     Column(Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(24.dp))
+        val shown = Format.stopwatch(elapsed)
         DotText(
-            Format.stopwatch(elapsed),
-            Modifier.fillMaxWidth().height(80.dp),
+            shown,
+            // Piu' alta: i numeri sfumati sopra e sotto hanno il loro spazio
+            // invece di finire addosso al resto.
+            Modifier.fillMaxWidth().height(104.dp),
             cell = 8.dp,
             color = MaterialTheme.colorScheme.onBackground,
             animateChanges = true,
+            groupMods = stopwatchMods(shown),
         )
         Spacer(Modifier.height(24.dp))
         LazyColumn(

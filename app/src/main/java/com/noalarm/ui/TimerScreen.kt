@@ -16,9 +16,10 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Backspace
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -85,10 +86,15 @@ fun TimerScreen() {
 /** Minuti aggiunti dal pulsante di prolunga. */
 private const val TIMER_STEP = 1
 
+/** Ore libere, minuti e secondi a 60: il giro delle cifre del conto alla rovescia. */
+private fun timerMods(text: String): List<Int> =
+    if (text.count { it == ':' } == 2) listOf(100, 60, 60) else listOf(60, 60)
+
 @Composable
 private fun TimerCard(t: TimerItem, now: Long) {
     val context = LocalContext.current
     val left = t.remaining(now)
+    val shown = Format.timer(left.coerceAtLeast(0))
     Panel {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -99,13 +105,15 @@ private fun TimerCard(t: TimerItem, now: Long) {
             )
             Spacer(Modifier.height(8.dp))
             DotText(
-                Format.timer(left.coerceAtLeast(0)),
+                shown,
                 // Piu' alta del semplice testo: lascia spazio alle cifre adiacenti
-                // sfumate sopra e sotto, come nel carosello del selettore dell'ora.
-                Modifier.fillMaxWidth().height(96.dp),
+                // sfumate sopra e sotto senza finire addosso a quello che sta
+                // sopra e sotto la finestra.
+                Modifier.fillMaxWidth().height(124.dp),
                 cell = 8.dp,
                 color = MaterialTheme.colorScheme.onSurface,
                 animateChanges = true,
+                groupMods = timerMods(shown),
             )
             Spacer(Modifier.height(12.dp))
             LinearProgressIndicator(
@@ -116,17 +124,20 @@ private fun TimerCard(t: TimerItem, now: Long) {
             )
             Spacer(Modifier.height(16.dp))
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Con un passo di un minuto basta il simbolo; se un giorno
-                // diventasse piu' grande, la quantita' va detta.
-                if (TIMER_STEP > 1) DotButton(
-                    "+$TIMER_STEP min",
-                    { ClockService.timerAdd(context, t.id, TIMER_STEP) }, size = 56,
-                ) else DotIconButton(
-                    Icons.Outlined.MoreTime, "Aggiungi $TIMER_STEP minuto",
-                    { ClockService.timerAdd(context, t.id, TIMER_STEP) }, size = 56,
+                DotIconButton(
+                    Icons.Outlined.Refresh, "Azzera il timer",
+                    { ClockService.timerReset(context, t.id) },
+                    size = 48,
+                    enabled = t.expired || left < t.totalMs,
+                )
+                DotIconButton(
+                    Icons.Outlined.Remove, "Togli $TIMER_STEP minuto",
+                    { ClockService.timerAdd(context, t.id, -TIMER_STEP) },
+                    size = 48,
+                    enabled = !t.expired && left > TIMER_STEP * 60_000L,
                 )
                 DotIconButton(
                     if (t.running) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
@@ -136,9 +147,14 @@ private fun TimerCard(t: TimerItem, now: Long) {
                     enabled = !t.expired,
                 )
                 DotIconButton(
+                    Icons.Outlined.Add, "Aggiungi $TIMER_STEP minuto",
+                    { ClockService.timerAdd(context, t.id, TIMER_STEP) },
+                    size = 48,
+                )
+                DotIconButton(
                     Icons.Outlined.Delete, "Elimina il timer",
                     { Store.removeTimer(t.id); ClockService.sync(context) },
-                    size = 56,
+                    size = 48,
                     color = MaterialTheme.colorScheme.secondary,
                     contentColor = MaterialTheme.colorScheme.onSecondary,
                 )

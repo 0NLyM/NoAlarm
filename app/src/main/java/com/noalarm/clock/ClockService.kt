@@ -47,6 +47,7 @@ class ClockService : Service() {
             A_TIMER_STOP -> stopTimer(intent.getLongExtra(EXTRA_ID, 0))
             A_TIMER_ADD -> addMinutes(intent.getLongExtra(EXTRA_ID, 0), intent.getIntExtra(EXTRA_VALUE, 1))
             A_TIMER_TOGGLE -> toggleTimer(intent.getLongExtra(EXTRA_ID, 0))
+            A_TIMER_RESET -> resetTimer(intent.getLongExtra(EXTRA_ID, 0))
             A_SW_TOGGLE -> toggleStopwatch()
             A_SW_LAP -> lap()
             A_SW_RESET -> resetStopwatch()
@@ -169,13 +170,26 @@ class ClockService : Service() {
         stopAlert()
         val now = System.currentTimeMillis()
         Store.updateTimer(id) {
+            // Aggiungere fa ripartire un timer fermo o scaduto, togliere no:
+            // chi accorcia un timer in pausa non se lo aspetta avviato.
+            val resume = minutes > 0 || it.running
             val base = if (it.expired) now else if (it.running) it.endAt else now + it.remainingMs
+            val end = (base + minutes * 60_000L).coerceAtLeast(now)
             it.copy(
                 firedAt = 0,
-                running = true,
-                endAt = base + minutes * 60_000L,
-                totalMs = it.totalMs + minutes * 60_000L,
+                running = resume,
+                endAt = if (resume) end else 0,
+                remainingMs = end - now,
+                totalMs = (it.totalMs + minutes * 60_000L).coerceAtLeast(60_000L),
             )
+        }
+    }
+
+    /** Riporta il timer al suo tempo pieno, fermo. */
+    private fun resetTimer(id: Long) {
+        stopAlert()
+        Store.updateTimer(id) {
+            it.copy(firedAt = 0, running = false, endAt = 0, remainingMs = it.totalMs)
         }
     }
 
@@ -250,6 +264,7 @@ class ClockService : Service() {
         private const val A_TIMER_STOP = "t_stop"
         private const val A_TIMER_ADD = "t_add"
         private const val A_TIMER_TOGGLE = "t_toggle"
+        private const val A_TIMER_RESET = "t_reset"
         private const val A_SW_TOGGLE = "s_toggle"
         private const val A_SW_LAP = "s_lap"
         private const val A_SW_RESET = "s_reset"
@@ -264,8 +279,10 @@ class ClockService : Service() {
         fun sync(c: Context) = send(c, "sync")
 
         fun timerStop(c: Context, id: Long) = send(c, A_TIMER_STOP, id)
-        fun timerAdd(c: Context, id: Long, minutes: Int) = send(c, A_TIMER_ADD, id, minutes.coerceAtLeast(1))
+        /** [minutes] negativo accorcia il timer invece di allungarlo. */
+        fun timerAdd(c: Context, id: Long, minutes: Int) = send(c, A_TIMER_ADD, id, minutes)
         fun timerToggle(c: Context, id: Long) = send(c, A_TIMER_TOGGLE, id)
+        fun timerReset(c: Context, id: Long) = send(c, A_TIMER_RESET, id)
         fun stopwatchToggle(c: Context) = send(c, A_SW_TOGGLE)
         fun stopwatchLap(c: Context) = send(c, A_SW_LAP)
         fun stopwatchReset(c: Context) = send(c, A_SW_RESET)

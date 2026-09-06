@@ -182,15 +182,20 @@ private fun GridField(
     // percorso piu' breve): e' quello che fa scorrere davvero tante celle
     // quante ne chiede il lancio, invece di limitarsi alla cifra piu' vicina.
     suspend fun snapTo(targetR: Float, targetC: Float) {
-        val (wr, wc) = wrapPos(targetR, targetC)
+        // Bersaglio arrotondato alla cella: da fermo un numero e' sempre
+        // esattamente al centro, mai a meta' strada fra due.
+        val endR = targetR.roundToInt().toFloat()
+        val rawC = targetC.roundToInt()
+        val (wr, wc) = wrapPos(endR, targetC)
         // Se il bersaglio cade oltre l'ultima colonna valida di una riga
         // incompleta, accorcia l'animazione fino a li' invece di continuare a
         // scorrere su celle che non esistono (solo le ore hanno righe cosi').
-        val rawWc = Math.floorMod(targetC.roundToInt(), cols)
-        val adjTargetC = targetC - (rawWc - wc)
+        val endC = (rawC - (Math.floorMod(rawC, cols) - wc)).toFloat()
+        // Molla critica e morbida: decelera sempre piu' piano fino a fermarsi
+        // sulla cella, senza rimbalzare oltre.
         coroutineScope {
-            launch { dragR.animateTo(targetR, spring(dampingRatio = 1.09f, stiffness = 190f)) }
-            launch { dragC.animateTo(adjTargetC, spring(dampingRatio = 1.09f, stiffness = 190f)) }
+            launch { dragR.animateTo(endR, spring(dampingRatio = 1f, stiffness = 130f)) }
+            launch { dragC.animateTo(endC, spring(dampingRatio = 1f, stiffness = 130f)) }
         }
         val newValue = wr * 10 + wc
         if (newValue != lastReported) {
@@ -236,6 +241,8 @@ private fun GridField(
                     },
                     onDragCancel = {
                         scope.launch { press.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 300f)) }
+                        // Anche un gesto annullato deve lasciare un numero al centro.
+                        scope.launch { snapTo(dragR.value, dragC.value) }
                     },
                 ) { change, dragAmount ->
                     change.consume()

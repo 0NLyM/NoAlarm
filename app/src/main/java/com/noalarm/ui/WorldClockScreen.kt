@@ -60,13 +60,16 @@ fun WorldClockScreen() {
                 ) {
                     DotText(
                         Format.clock(here, settings.use24h, settings.showSeconds),
-                        Modifier.fillMaxWidth().height(90.dp),
+                        // Piu' alta del testo: lascia respirare i numeri sfumati
+                        // sopra e sotto quello attivo invece di tagliarli subito.
+                        Modifier.fillMaxWidth().height(if (settings.showSeconds) 104.dp else 118.dp),
                         cell = if (settings.showSeconds) 8.dp else 12.dp,
                         color = MaterialTheme.colorScheme.onBackground,
                         accentChars = setOf(':'),
                         accentColor = MaterialTheme.colorScheme.secondary,
                         blinkAccent = true,
                         animateChanges = true,
+                        groupMods = clockMods(settings.use24h, settings.showSeconds),
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
@@ -93,13 +96,14 @@ fun WorldClockScreen() {
                             ) {
                                 DotText(
                                     there?.let { Format.clock(it, settings.use24h) } ?: "--:--",
-                                    Modifier.fillMaxWidth().height(60.dp),
+                                    Modifier.fillMaxWidth().height(82.dp),
                                     cell = 8.dp,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     accentChars = setOf(':'),
                                     accentColor = MaterialTheme.colorScheme.secondary,
                                     blinkAccent = true,
                                     animateChanges = true,
+                                    groupMods = clockMods(settings.use24h, false),
                                 )
                                 Spacer(Modifier.height(12.dp))
                                 Text(
@@ -148,6 +152,14 @@ fun WorldClockScreen() {
         ) { ZonePicker { zone -> Store.update { s -> s.copy(worldClocks = (s.worldClocks + zone).distinct()) }; picking = false } }
     }
 }
+
+/**
+ * Il giro di ogni gruppo di cifre dell'orologio: dopo le 23 tornano le 00,
+ * dopo i 59 minuti gli 00. In 12h le ore vanno da 1 a 12 e non sono un
+ * modulo pulito, quindi si lascia il conteggio libero a due cifre.
+ */
+private fun clockMods(use24h: Boolean, seconds: Boolean): List<Int> =
+    listOf(if (use24h) 24 else 100, 60) + if (seconds) listOf(60) else emptyList()
 
 @Composable
 private fun ZonePicker(onPick: (String) -> Unit) {

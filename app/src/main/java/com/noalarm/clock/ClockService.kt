@@ -170,9 +170,10 @@ class ClockService : Service() {
         stopAlert()
         val now = System.currentTimeMillis()
         Store.updateTimer(id) {
-            // Aggiungere fa ripartire un timer fermo o scaduto, togliere no:
-            // chi accorcia un timer in pausa non se lo aspetta avviato.
-            val resume = minutes > 0 || it.running
+            // Un timer scaduto riparte (e' quello che serve al "+1 MIN" della
+            // notifica quando sta suonando), uno in pausa resta in pausa:
+            // aggiungere o togliere minuti non deve avviarlo.
+            val resume = it.running || it.expired
             val base = if (it.expired) now else if (it.running) it.endAt else now + it.remainingMs
             val end = (base + minutes * 60_000L).coerceAtLeast(now)
             it.copy(

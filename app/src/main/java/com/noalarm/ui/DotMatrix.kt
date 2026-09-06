@@ -8,11 +8,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.noalarm.ui.theme.LocalDotOff
@@ -52,7 +57,11 @@ private fun groupsOf(text: String, mods: List<Int>): List<DigitGroup> {
         if (text[i] !in '0'..'9') { i++; continue }
         var j = i
         while (j < text.length && text[j] in '0'..'9') j++
-        out += DigitGroup(i, j - i, mods.getOrNull(out.size) ?: pow10(j - i))
+        val len = j - i
+        // Il modulo non puo' superare le cifre del gruppo, altrimenti un
+        // vicino a due cifre in una colonna sola sborderebbe sul separatore.
+        val mod = minOf(mods.getOrNull(out.size) ?: pow10(len), pow10(len))
+        out += DigitGroup(i, len, mod)
         i = j
     }
     return out
@@ -95,6 +104,7 @@ fun DotText(
     blinkAccent: Boolean = false,
     animateChanges: Boolean = false,
     groupMods: List<Int> = emptyList(),
+    maxRollSteps: Float = 1.5f,
 ) {
     val cols = DotFont.width(text, tracking)
     val blinkOn = if (blinkAccent) rememberNow(1000L) / 1000 % 2 == 0L else true
@@ -108,6 +118,11 @@ fun DotText(
     val lastChange = remember(shape, groupMods) { LongArray(groups.size) }
     var previous by remember(shape) { mutableStateOf(text) }
 
+    // Le animazioni vivono nello scope del composable, non in quello dell'effetto:
+    // il testo cambia a ogni tick (50ms sul cronometro) e un LaunchedEffect(text)
+    // le avrebbe interrotte tutte a meta' a ogni tick, lasciando ferme le cifre
+    // piu' lente proprio mentre stavano scorrendo.
+    val scope = rememberCoroutineScope()
     LaunchedEffect(text, animateChanges) {
         if (animateChanges && previous.length == text.length) {
             val now = System.currentTimeMillis()
@@ -118,9 +133,10 @@ fun DotText(
                 // l'animazione precedente viene interrotta a meta', il rullo
                 // si ferma sempre esattamente su un numero, allineato agli altri.
                 val target = nearestCongruent(rolls[i].value, to, g.mod)
-                val jump = abs(target - rolls[i].value) > 1.5f || now - lastChange[i] < ROLL_FAST_MS
+                val jump = abs(target - rolls[i].value) > maxRollSteps ||
+                    now - lastChange[i] < ROLL_FAST_MS
                 lastChange[i] = now
-                launch {
+                scope.launch {
                     if (jump) {
                         rolls[i].snapTo(to.toFloat())
                     } else {
@@ -135,7 +151,13 @@ fun DotText(
         previous = text
     }
 
-    Canvas(modifier.clipToBounds()) {
+    // Il livello fuori schermo serve alla sfumatura dei bordi: senza, la
+    // maschera cancellerebbe anche quello che c'e' sotto la finestra.
+    val canvas = if (animateChanges) {
+        modifier.clipToBounds().graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+    } else modifier
+
+    Canvas(canvas) {
         val p = cell.toPx()
         val r = p * 0.36f
         val ox = (size.width - cols * p) / 2f + p / 2f
@@ -170,9 +192,9 @@ fun DotText(
                 val dist = abs(d - v)
                 if (dist > ROLL_MAX_DIST) continue
                 val norm = (dist / ROLL_MAX_DIST).coerceAtMost(1f)
-                val alpha = (1f - norm).pow(1.6f)
+                val alpha = (1f - norm).pow(1.9f)
                 if (alpha <= 0.02f) continue
-                val dotR = r * (1f - norm * 0.45f)
+                val dotR = r * (1f - norm * 0.6f)
                 val y = oy + (d - v) * DotFont.H * p * ROLL_GAP
                 val s = Math.floorMod(d, g.mod).toString().padStart(g.len, '0')
                 val c = color.copy(alpha = color.alpha * alpha)
@@ -185,6 +207,22 @@ fun DotText(
                 }
             }
         }
+
+        // I numeri di sfondo svaniscono verso i bordi invece di essere tagliati
+        // di netto. La fascia piena copre esattamente il numero attivo, che
+        // resta sempre a piena intensita'.
+        val half = DotFont.H * p / 2f
+        val top = ((size.height / 2f - half - r) / size.height).coerceIn(0f, 1f)
+        val bottom = ((size.height / 2f + half + r) / size.height).coerceIn(top, 1f)
+        drawRect(
+            brush = Brush.verticalGradient(
+                0f to Color.Transparent,
+                top to Color.Black,
+                bottom to Color.Black,
+                1f to Color.Transparent,
+            ),
+            blendMode = BlendMode.DstIn,
+        )
     }
 }
 

@@ -62,7 +62,7 @@ fun WorldClockScreen() {
                         Format.clock(here, settings.use24h, settings.showSeconds),
                         // Piu' alta del testo: lascia respirare i numeri sfumati
                         // sopra e sotto quello attivo invece di tagliarli subito.
-                        Modifier.fillMaxWidth().height(if (settings.showSeconds) 120.dp else 150.dp),
+                        Modifier.fillMaxWidth().height(if (settings.showSeconds) 138.dp else 172.dp),
                         cell = if (settings.showSeconds) 8.dp else 12.dp,
                         color = MaterialTheme.colorScheme.onBackground,
                         accentChars = setOf(':'),
@@ -96,7 +96,7 @@ fun WorldClockScreen() {
                             ) {
                                 DotText(
                                     there?.let { Format.clock(it, settings.use24h) } ?: "--:--",
-                                    Modifier.fillMaxWidth().height(106.dp),
+                                    Modifier.fillMaxWidth().height(124.dp),
                                     cell = 8.dp,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     accentChars = setOf(':'),

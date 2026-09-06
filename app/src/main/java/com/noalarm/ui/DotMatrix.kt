@@ -1,7 +1,8 @@
 package com.noalarm.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,6 +28,7 @@ import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sign
+import kotlin.math.sqrt
 
 /** Quanto lontano (in numeri) resta visibile un vicino del rullo. */
 private const val ROLL_MAX_DIST = 2.2f
@@ -38,7 +40,18 @@ private const val ROLL_GAP = 0.95f
 private const val ROLL_DEPTH = 0.42f
 
 /** Quanto la fascia a piena intensita' sconfina verso i vicini, prima di sfumare. */
-private const val ROLL_FADE = 0.25f
+private const val ROLL_FADE = 0.45f
+
+/**
+ * La curva del rullo: parte piano invece che a strappo, prende velocita' nel
+ * mezzo e si ferma di colpo sul numero, come un meccanismo che scatta in
+ * posizione. Una molla farebbe l'opposto - massima spinta subito e coda lunga.
+ */
+private val ROLL_EASING = CubicBezierEasing(0.5f, 0f, 0.85f, 0.72f)
+
+/** Un passo e' svelto, un azzeramento che scorre per mezzo giro dura di piu'. */
+private fun rollDuration(steps: Float): Int =
+    (240 + 90 * sqrt(steps.coerceAtLeast(1f))).toInt().coerceAtMost(900)
 
 /**
  * Sotto questo intervallo fra due cambi il gruppo salta invece di scorrere:
@@ -153,7 +166,10 @@ fun DotText(
                     if (jump) {
                         rolls[i].snapTo(to.toFloat())
                     } else {
-                        rolls[i].animateTo(target, spring(dampingRatio = 1f, stiffness = 260f))
+                        rolls[i].animateTo(
+                            target,
+                            tween(rollDuration(abs(target - rolls[i].value)), easing = ROLL_EASING),
+                        )
                         // Riporta il valore dentro un giro: altrimenti dopo ore
                         // di secondi cresce senza limite e perde precisione.
                         rolls[i].snapTo(Math.floorMod(rolls[i].value.roundToInt(), g.mod).toFloat())

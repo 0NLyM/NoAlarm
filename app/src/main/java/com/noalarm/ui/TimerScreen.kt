@@ -112,7 +112,7 @@ private fun TimerCard(t: TimerItem, now: Long) {
                 // Piu' alta del semplice testo: lascia spazio alle cifre adiacenti
                 // sfumate sopra e sotto senza finire addosso a quello che sta
                 // sopra e sotto la finestra.
-                Modifier.fillMaxWidth().height(146.dp),
+                Modifier.fillMaxWidth().height(166.dp),
                 cell = 8.dp,
                 color = MaterialTheme.colorScheme.onSurface,
                 animateChanges = true,

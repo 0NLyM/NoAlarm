@@ -37,7 +37,11 @@ fun StopwatchScreen() {
     val context = LocalContext.current
     val sw by Store.stopwatch.collectAsStateWithLifecycle()
     val now = rememberNow(if (sw.running) 50L else 1000L)
-    val elapsed = sw.elapsed(now)
+    // now serve a far ricomporre, ma il tempo si legge sull'orologio vero: al
+    // via il tick e' ancora quello di prima (il periodo passa da 1s a 50ms) e
+    // per un istante elapsed veniva negativo, con minuti e secondi che facevano
+    // una falsa partenza all'indietro prima di rimettersi a posto.
+    val elapsed = sw.elapsed(maxOf(now, System.currentTimeMillis())).coerceAtLeast(0)
 
     Column(Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(24.dp))
@@ -46,7 +50,7 @@ fun StopwatchScreen() {
             shown,
             // Piu' alta: i numeri sfumati sopra e sotto hanno il loro spazio
             // invece di finire addosso al resto.
-            Modifier.fillMaxWidth().height(126.dp),
+            Modifier.fillMaxWidth().height(146.dp),
             cell = 8.dp,
             color = MaterialTheme.colorScheme.onBackground,
             animateChanges = true,

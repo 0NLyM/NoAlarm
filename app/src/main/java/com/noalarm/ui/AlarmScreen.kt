@@ -109,7 +109,7 @@ fun AlarmScreen() {
                         Spacer(Modifier.height(12.dp))
                         DotText(
                             Format.hhmm(next.first.hour, next.first.minute, settings.use24h),
-                            Modifier.fillMaxWidth().height(140.dp),
+                            Modifier.fillMaxWidth().height(162.dp),
                             cell = 11.dp,
                             color = MaterialTheme.colorScheme.onBackground,
                             animateChanges = true,

@@ -53,11 +53,14 @@ fun StopwatchScreen() {
             Modifier.fillMaxWidth().height(146.dp),
             cell = 8.dp,
             color = MaterialTheme.colorScheme.onBackground,
+            accentChars = setOf(':'),
+            accentColor = MaterialTheme.colorScheme.secondary,
             animateChanges = true,
             groupMods = stopwatchMods(shown),
-            // Azzerato: anche secondi e centesimi tornano a zero scorrendo,
-            // invece di saltarci di colpo come fanno mentre corrono.
-            forceRoll = !sw.running && elapsed == 0L,
+            // Fermo: che sia un azzeramento o solo una pausa, l'ultima cifra
+            // scorre visibilmente fino a fermarsi invece di saltarci di colpo
+            // come i centesimi fanno mentre il cronometro corre.
+            forceRoll = !sw.running,
         )
         Spacer(Modifier.height(24.dp))
         LazyColumn(

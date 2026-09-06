@@ -98,6 +98,11 @@ private fun TimerCard(t: TimerItem, now: Long) {
     // in piu' prima di iniziare a scendere.
     val left = t.remaining(maxOf(now, System.currentTimeMillis()))
     val shown = Format.timer(left.coerceAtLeast(0))
+    // La barra vuole un tick suo, veloce quanto quello del cronometro: con
+    // quello delle cifre (1s, allineato al secondo di sistema) restava ferma
+    // fino a un secondo intero dopo il play, e poi scattava invece di scorrere.
+    val barNow = rememberNow(if (t.running) 50L else 1000L)
+    val barLeft = t.remaining(maxOf(barNow, System.currentTimeMillis())).coerceAtLeast(0)
     Panel {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -115,6 +120,8 @@ private fun TimerCard(t: TimerItem, now: Long) {
                 Modifier.fillMaxWidth().height(166.dp),
                 cell = 8.dp,
                 color = MaterialTheme.colorScheme.onSurface,
+                accentChars = setOf(':'),
+                accentColor = MaterialTheme.colorScheme.secondary,
                 animateChanges = true,
                 groupMods = timerMods(shown),
                 // Riportato al tempo pieno: i numeri ci risalgono scorrendo.
@@ -122,7 +129,7 @@ private fun TimerCard(t: TimerItem, now: Long) {
             )
             Spacer(Modifier.height(12.dp))
             LinearProgressIndicator(
-                progress = { if (t.totalMs == 0L) 0f else (left.toFloat() / t.totalMs).coerceIn(0f, 1f) },
+                progress = { if (t.totalMs == 0L) 0f else (barLeft.toFloat() / t.totalMs).coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.secondary,
                 trackColor = MaterialTheme.colorScheme.outline,
@@ -196,6 +203,8 @@ private fun Keypad(
             cell = 7.dp,
             color = if (digits.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
             else MaterialTheme.colorScheme.onBackground,
+            accentChars = setOf(':'),
+            accentColor = MaterialTheme.colorScheme.secondary,
         )
         Text("ORE · MINUTI · SECONDI", style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)

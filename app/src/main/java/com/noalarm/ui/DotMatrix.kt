@@ -161,11 +161,15 @@ fun DotText(
                 val jump = !forceRoll && (
                     abs(target - rolls[i].value) > 1.5f || now - lastChange[i] < ROLL_FAST_MS
                     )
-                lastChange[i] = now
                 scope.launch {
                     if (jump) {
                         rolls[i].snapTo(to.toFloat())
                     } else {
+                        // Segna il momento solo di un rullo vero: se lo si
+                        // aggiornasse a ogni salto, un gruppo che cambia piu'
+                        // spesso di ROLL_FAST_MS (i centesimi) non scorrerebbe
+                        // mai piu' dopo il primo giro.
+                        lastChange[i] = now
                         rolls[i].animateTo(
                             target,
                             tween(rollDuration(abs(target - rolls[i].value)), easing = ROLL_EASING),

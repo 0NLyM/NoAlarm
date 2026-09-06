@@ -32,7 +32,7 @@ import kotlin.math.sign
 private const val ROLL_MAX_DIST = 2.2f
 
 /** Distanza fra un numero e il successivo, in altezze di cifra. */
-private const val ROLL_GAP = 0.75f
+private const val ROLL_GAP = 0.95f
 
 /** Quanto rimpicciolisce un numero per ogni passo di distanza: e' la profondita'. */
 private const val ROLL_DEPTH = 0.42f

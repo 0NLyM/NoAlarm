@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -35,7 +34,6 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -168,7 +166,8 @@ fun AlarmScreen() {
             }
         }
 
-        FloatingActionButton(
+        NothingFab(
+            Icons.Outlined.Add, "Nuova sveglia",
             onClick = {
                 val now = LocalTime.now()
                 editing = Alarm(
@@ -179,11 +178,8 @@ fun AlarmScreen() {
                     autoSilenceMinutes = settings.defaultAutoSilenceMinutes,
                 )
             },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 104.dp),
-            shape = CircleShape,
-            containerColor = MaterialTheme.colorScheme.secondary,
-            contentColor = MaterialTheme.colorScheme.onSecondary,
-        ) { Icon(Icons.Outlined.Add, "Nuova sveglia") }
+            modifier = Modifier.align(Alignment.BottomEnd),
+        )
 
         // Fuori dal foglio di modifica, che nel frattempo si e' gia' chiuso:
         // si puo' continuare a usare il resto della schermata mentre e' visibile.

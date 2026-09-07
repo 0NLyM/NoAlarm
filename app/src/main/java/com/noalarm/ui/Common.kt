@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -130,6 +132,26 @@ fun DotIconButton(
         tint = if (enabled) contentColor else contentColor.copy(alpha = 0.4f),
     )
 }
+
+/**
+ * Il tasto "+" flottante di sveglia, orologio internazionale e timer: rotondo
+ * e agganciato in basso a destra, alla stessa altezza della pillola del menu
+ * invece che sospeso piu' in alto - le due file si leggono come un unico
+ * livello di comandi.
+ */
+@Composable
+fun NothingFab(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) = FloatingActionButton(
+    onClick = onClick,
+    modifier = modifier.navigationBarsPadding().padding(end = 24.dp, bottom = 14.dp),
+    shape = CircleShape,
+    containerColor = MaterialTheme.colorScheme.secondary,
+    contentColor = MaterialTheme.colorScheme.onSecondary,
+) { Icon(icon, description) }
 
 /**
  * Pulsante largo a forma di pillola, con il testo per intero: per le due azioni

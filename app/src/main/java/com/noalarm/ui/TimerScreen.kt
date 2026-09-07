@@ -73,13 +73,12 @@ fun TimerScreen() {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(timers, key = { it.id }) { t -> TimerCard(t, now) }
-            item {
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    DotIconButton(Icons.Outlined.Add, "Nuovo timer", { adding = true })
-                }
-            }
         }
+        NothingFab(
+            Icons.Outlined.Add, "Nuovo timer",
+            onClick = { adding = true },
+            modifier = Modifier.align(Alignment.BottomEnd),
+        )
     }
 }
 

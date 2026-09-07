@@ -16,7 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -133,12 +132,11 @@ fun WorldClockScreen() {
             }
         }
 
-        FloatingActionButton(
+        NothingFab(
+            Icons.Outlined.Add, "Aggiungi citta'",
             onClick = { picking = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 104.dp),
-            containerColor = MaterialTheme.colorScheme.secondary,
-            contentColor = MaterialTheme.colorScheme.onSecondary,
-        ) { Icon(Icons.Outlined.Add, "Aggiungi citta'") }
+            modifier = Modifier.align(Alignment.BottomEnd),
+        )
     }
 
     if (picking) {

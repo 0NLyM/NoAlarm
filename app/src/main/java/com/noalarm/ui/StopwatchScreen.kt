@@ -53,7 +53,7 @@ fun StopwatchScreen() {
             Modifier.fillMaxWidth().height(146.dp),
             cell = 8.dp,
             color = MaterialTheme.colorScheme.onBackground,
-            accentChars = setOf(':'),
+            accentChars = setOf(':', '.'),
             accentColor = MaterialTheme.colorScheme.secondary,
             animateChanges = true,
             groupMods = stopwatchMods(shown),

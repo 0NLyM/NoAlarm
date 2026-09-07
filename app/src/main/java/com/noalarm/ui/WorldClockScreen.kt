@@ -67,7 +67,6 @@ fun WorldClockScreen() {
                         color = MaterialTheme.colorScheme.onBackground,
                         accentChars = setOf(':'),
                         accentColor = MaterialTheme.colorScheme.secondary,
-                        blinkAccent = true,
                         animateChanges = true,
                         groupMods = clockMods(settings.use24h, settings.showSeconds),
                     )
@@ -101,7 +100,6 @@ fun WorldClockScreen() {
                                     color = MaterialTheme.colorScheme.onSurface,
                                     accentChars = setOf(':'),
                                     accentColor = MaterialTheme.colorScheme.secondary,
-                                    blinkAccent = true,
                                     animateChanges = true,
                                     groupMods = clockMods(settings.use24h, false),
                                 )

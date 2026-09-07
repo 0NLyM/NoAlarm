@@ -54,12 +54,19 @@ private fun rollDuration(steps: Float): Int =
     (240 + 90 * sqrt(steps.coerceAtLeast(1f))).toInt().coerceAtMost(900)
 
 /**
- * Sotto questo intervallo fra due cambi il gruppo salta invece di scorrere:
- * i centesimi del cronometro cambiano ogni 50ms, scorrerebbero troppo in
- * fretta per leggerli e renderebbero confusa anche l'animazione dei secondi.
- * Il tempo mostrato resta comunque quello esatto, si salta solo l'animazione.
+ * Durata del rullo per un gruppo che ticchetta da solo piu' di un passo a
+ * ogni cambio (i centesimi del cronometro, ogni 50ms): fissa e breve invece
+ * che scalata sulla distanza, altrimenti si allungherebbe di giro in giro -
+ * il gruppo continua a correre mentre il rullo e' occupato - fino a restare
+ * sempre piu' indietro, per poi doverlo recuperare tutto d'un colpo quando
+ * si ferma. Il tempo mostrato resta comunque quello esatto, e' solo il
+ * rullo a saltare qualche cifra di mezzo.
  */
-private const val ROLL_FAST_MS = 200L
+private const val ROLL_FAST_MS = 200
+
+/** Un balzo piu' vecchio di cosi' e' l'app tornata in primo piano dopo un
+ * po', non un ticchettio: si salta di netto invece di inseguirlo scorrendo. */
+private const val ROLL_STALE_MS = 1500L
 
 /** Un gruppo di cifre consecutive (le ore, i minuti, ...) che scorre insieme. */
 private class DigitGroup(val start: Int, val len: Int, val mod: Int)
@@ -141,6 +148,9 @@ fun DotText(
     val groups = remember(shape, groupMods) { groupsOf(text, groupMods) }
     val rolls = remember(shape, groupMods) { groups.map { Animatable(valueOf(text, it).toFloat()) } }
     val lastChange = remember(shape, groupMods) { LongArray(groups.size) }
+    // Fino a quando un rullo e' occupato a scorrere: mentre lo e', i cambi
+    // successivi si saltano invece di interromperlo con uno snap.
+    val busyUntil = remember(shape, groupMods) { LongArray(groups.size) }
     var previous by remember(shape) { mutableStateOf(text) }
 
     // Le animazioni vivono nello scope del composable, non in quello dell'effetto:
@@ -153,27 +163,37 @@ fun DotText(
             val now = System.currentTimeMillis()
             groups.forEachIndexed { i, g ->
                 val to = valueOf(text, g)
-                if (to == valueOf(previous, g)) return@forEachIndexed
+                val from = valueOf(previous, g)
+                if (to == from) return@forEachIndexed
+                // Un rullo per questo gruppo e' gia' in corsa: lo si lascia
+                // finire invece di interromperlo con uno snap, altrimenti un
+                // gruppo che cambia piu' spesso della durata del proprio
+                // rullo (i centesimi) non arriverebbe mai a scorrere davvero.
+                if (!forceRoll && now < busyUntil[i]) return@forEachIndexed
                 // Bersaglio assoluto invece che incrementale: anche se
                 // l'animazione precedente viene interrotta a meta', il rullo
                 // si ferma sempre esattamente su un numero, allineato agli altri.
                 val target = nearestCongruent(rolls[i].value, to, g.mod)
-                val jump = !forceRoll && (
-                    abs(target - rolls[i].value) > 1.5f || now - lastChange[i] < ROLL_FAST_MS
-                    )
+                // Un balzo vecchio e' quasi certo l'app tornata in primo
+                // piano dopo un po', non un ticchettio normale.
+                val stale = lastChange[i] != 0L && now - lastChange[i] > ROLL_STALE_MS
+                val jump = !forceRoll && stale
+                lastChange[i] = now
+                // Quanto si sposta il gruppo da solo, in un tick non ancora
+                // rallentato da nessun rullo in corso: se piu' di un passo,
+                // ticchetta piu' in fretta di quanto la vista possa seguirlo
+                // cifra per cifra (i centesimi) e vuole una durata fissa e
+                // breve invece che scalata sulla distanza - si veda il
+                // commento su ROLL_FAST_MS.
+                val naturalStep = minOf(abs(to - from), g.mod - abs(to - from))
+                val duration = if (!forceRoll && naturalStep > 1) ROLL_FAST_MS
+                else rollDuration(abs(target - rolls[i].value))
+                if (!jump) busyUntil[i] = now + duration
                 scope.launch {
                     if (jump) {
                         rolls[i].snapTo(to.toFloat())
                     } else {
-                        // Segna il momento solo di un rullo vero: se lo si
-                        // aggiornasse a ogni salto, un gruppo che cambia piu'
-                        // spesso di ROLL_FAST_MS (i centesimi) non scorrerebbe
-                        // mai piu' dopo il primo giro.
-                        lastChange[i] = now
-                        rolls[i].animateTo(
-                            target,
-                            tween(rollDuration(abs(target - rolls[i].value)), easing = ROLL_EASING),
-                        )
+                        rolls[i].animateTo(target, tween(duration, easing = ROLL_EASING))
                         // Riporta il valore dentro un giro: altrimenti dopo ore
                         // di secondi cresce senza limite e perde precisione.
                         rolls[i].snapTo(Math.floorMod(rolls[i].value.roundToInt(), g.mod).toFloat())

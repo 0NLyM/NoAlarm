@@ -112,6 +112,8 @@ fun AlarmScreen() {
                             Modifier.fillMaxWidth().height(162.dp),
                             cell = 11.dp,
                             color = MaterialTheme.colorScheme.onBackground,
+                            accentChars = setOf(':'),
+                            accentColor = MaterialTheme.colorScheme.secondary,
                             animateChanges = true,
                             // In 12h le ore vanno da 1 a 12 e non sono un modulo
                             // pulito: si lascia il conteggio libero a due cifre.

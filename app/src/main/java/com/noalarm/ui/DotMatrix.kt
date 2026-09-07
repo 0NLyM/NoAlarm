@@ -198,7 +198,13 @@ fun DotText(
     // le avrebbe interrotte tutte a meta' a ogni tick, lasciando ferme le cifre
     // piu' lente proprio mentre stavano scorrendo.
     val scope = rememberCoroutineScope()
-    LaunchedEffect(text, animateChanges) {
+    // forceRoll e' una chiave anche lui: senza, quando cambia da solo (senza
+    // che cambi anche il testo, capita spesso proprio nell'istante in cui si
+    // preme pausa o play, perche' il valore vero non e' ancora avanzato)
+    // l'effetto non si riavvia e resta con la versione vecchia - un rullo
+    // libero poteva restare in corsa dopo la pausa (mai spento) o partire
+    // in ritardo dopo il play.
+    LaunchedEffect(text, animateChanges, forceRoll) {
         if (animateChanges && previous.length == text.length) {
             val now = System.currentTimeMillis()
             groups.forEachIndexed { i, g ->

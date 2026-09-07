@@ -134,10 +134,15 @@ fun DotIconButton(
 }
 
 /**
- * Il tasto "+" flottante di sveglia, orologio internazionale e timer: rotondo
- * e agganciato in basso a destra, alla stessa altezza della pillola del menu
- * invece che sospeso piu' in alto - le due file si leggono come un unico
- * livello di comandi.
+ * Il tasto "+" flottante di sveglia, orologio internazionale, timer e
+ * calendario: rotondo e agganciato in basso a destra, allineato in
+ * orizzontale con la pillola del menu invece che sospeso piu' in alto - le
+ * due file si leggono come un unico livello di comandi.
+ *
+ * L'altezza (60.dp) e il margine dal basso (12.dp, dopo lo stesso
+ * navigationBarsPadding) sono identici a quelli della pillola in
+ * NothingBottomBar - non un valore a meta' calcolato a occhio, cosi' i due
+ * centri coincidono per costruzione invece che per approssimazione.
  */
 @Composable
 fun NothingFab(
@@ -147,7 +152,7 @@ fun NothingFab(
     modifier: Modifier = Modifier,
 ) = FloatingActionButton(
     onClick = onClick,
-    modifier = modifier.navigationBarsPadding().padding(end = 24.dp, bottom = 14.dp),
+    modifier = modifier.navigationBarsPadding().padding(end = 24.dp, bottom = 12.dp).size(60.dp),
     shape = CircleShape,
     containerColor = MaterialTheme.colorScheme.secondary,
     contentColor = MaterialTheme.colorScheme.onSecondary,

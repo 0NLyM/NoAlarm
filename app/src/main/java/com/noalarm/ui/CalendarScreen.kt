@@ -26,7 +26,6 @@ import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.FiberManualRecord
 import androidx.compose.material.icons.outlined.Today
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -193,7 +192,8 @@ fun CalendarScreen() {
             }
         }
 
-        FloatingActionButton(
+        NothingFab(
+            Icons.Outlined.Add, "Nuova sveglia il ${Format.dateLabel(selected)}",
             onClick = {
                 val now = LocalTime.now()
                 editing = Alarm(
@@ -205,11 +205,8 @@ fun CalendarScreen() {
                     autoSilenceMinutes = settings.defaultAutoSilenceMinutes,
                 )
             },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 104.dp),
-            shape = CircleShape,
-            containerColor = MaterialTheme.colorScheme.secondary,
-            contentColor = MaterialTheme.colorScheme.onSecondary,
-        ) { Icon(Icons.Outlined.Add, "Nuova sveglia il ${Format.dateLabel(selected)}") }
+            modifier = Modifier.align(Alignment.BottomEnd),
+        )
 
         recentlyDeleted?.let { alarm ->
             Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp).padding(bottom = 176.dp)) {

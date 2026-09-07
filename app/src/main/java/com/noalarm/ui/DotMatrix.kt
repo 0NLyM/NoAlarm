@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.noalarm.ui.theme.LocalDotOff
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -77,8 +76,16 @@ private const val SPIN_STEP_MS = 50
  * La frenata di un gruppo "libero" quando si ferma (pausa o azzeramento):
  * rallenta invece di scattare di colpo come i normali passi (ROLL_EASING),
  * il contrario esatto - qui la corsa deve spegnersi dolcemente.
+ *
+ * La durata e' fissa, non scalata sulla distanza come rollDuration: il
+ * punto di arrivo e' sempre in avanti (mai indietro, si veda
+ * forwardCongruent), quindi nel caso peggiore puo' essere quasi un giro
+ * intero - scalarci sopra la durata l'avrebbe fatta durare quasi un
+ * secondo, sembrando che non si fermasse mai e finendo ben dopo i secondi,
+ * che nel frattempo si sono gia' fermati.
  */
 private val SETTLE_EASING = LinearOutSlowInEasing
+private const val SETTLE_MS = 280
 
 /** Un gruppo di cifre consecutive (le ore, i minuti, ...) che scorre insieme. */
 private class DigitGroup(val start: Int, val len: Int, val mod: Int)
@@ -177,10 +184,13 @@ fun DotText(
     // di questo DotText, cosi' anche alla pausa/azzeramento si sa che deve
     // fermarsi solo in avanti invece che nella direzione piu' vicina.
     val fast = remember(shape, groupMods) { BooleanArray(groups.size) }
-    // Il loop che fa scorrere libero un gruppo "veloce": va fermato appena
-    // arriva una pausa o un azzeramento, altrimenti continuerebbe a
-    // ripartire in gara con il rullo di atterraggio.
-    val spinJob = remember(shape, groupMods) { arrayOfNulls<Job>(groups.size) }
+    // Se il loop che fa scorrere libero un gruppo "veloce" e' attivo: si
+    // spegne mettendolo a false, controllato dal loop stesso a ogni giro -
+    // non bastava cancellare la coroutine, perche' un giro gia' avviato
+    // poteva completarsi comunque e ripartire subito dopo, in gara con il
+    // rullo di atterraggio appena lanciato (la causa della corsa che a
+    // volte non si fermava).
+    val spinning = remember(shape, groupMods) { BooleanArray(groups.size) }
     var previous by remember(shape) { mutableStateOf(text) }
 
     // Le animazioni vivono nello scope del composable, non in quello dell'effetto:
@@ -201,15 +211,15 @@ fun DotText(
                     // dopo aver corso in un verso sembra tornare indietro),
                     // rallentando invece di scattare di colpo come i normali
                     // passi.
-                    spinJob[i]?.cancel()
-                    spinJob[i] = null
+                    spinning[i] = false
                     lastChange[i] = now
                     val target = if (fast[i]) forwardCongruent(rolls[i].value, to, g.mod)
                     else nearestCongruent(rolls[i].value, to, g.mod)
-                    val easing = if (fast[i]) SETTLE_EASING else ROLL_EASING
                     val distance = abs(target - rolls[i].value)
+                    val easing = if (fast[i]) SETTLE_EASING else ROLL_EASING
+                    val duration = if (fast[i]) SETTLE_MS else rollDuration(distance)
                     scope.launch {
-                        if (distance > 0f) rolls[i].animateTo(target, tween(rollDuration(distance), easing = easing))
+                        if (distance > 0f) rolls[i].animateTo(target, tween(duration, easing = easing))
                         rolls[i].snapTo(Math.floorMod(rolls[i].value.roundToInt(), g.mod).toFloat())
                     }
                     return@forEachIndexed
@@ -226,10 +236,16 @@ fun DotText(
                 val naturalStep = minOf(abs(to - from), g.mod - abs(to - from))
                 if (naturalStep > 1) {
                     fast[i] = true
-                    if (spinJob[i]?.isActive != true) {
-                        spinJob[i] = scope.launch {
-                            while (true) {
+                    if (!spinning[i]) {
+                        spinning[i] = true
+                        scope.launch {
+                            // Il flag e' controllato a ogni giro, non solo
+                            // all'avvio: se nel frattempo arriva una pausa
+                            // che lo spegne, il loop esce invece di
+                            // scorrere ancora un giro e ripartire.
+                            while (spinning[i]) {
                                 rolls[i].animateTo(rolls[i].value + SPIN_STEP, tween(SPIN_STEP_MS, easing = LinearEasing))
+                                if (!spinning[i]) break
                                 rolls[i].snapTo(Math.floorMod(rolls[i].value.roundToInt(), g.mod).toFloat())
                             }
                         }

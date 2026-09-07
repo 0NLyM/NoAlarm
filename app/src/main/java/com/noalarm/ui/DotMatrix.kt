@@ -2,6 +2,8 @@ package com.noalarm.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
@@ -22,8 +24,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.noalarm.ui.theme.LocalDotOff
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -53,20 +57,28 @@ private val ROLL_EASING = CubicBezierEasing(0.5f, 0f, 0.85f, 0.72f)
 private fun rollDuration(steps: Float): Int =
     (240 + 90 * sqrt(steps.coerceAtLeast(1f))).toInt().coerceAtMost(900)
 
-/**
- * Durata del rullo per un gruppo che ticchetta da solo piu' di un passo a
- * ogni cambio (i centesimi del cronometro, ogni 50ms): fissa e breve invece
- * che scalata sulla distanza, altrimenti si allungherebbe di giro in giro -
- * il gruppo continua a correre mentre il rullo e' occupato - fino a restare
- * sempre piu' indietro, per poi doverlo recuperare tutto d'un colpo quando
- * si ferma. Il tempo mostrato resta comunque quello esatto, e' solo il
- * rullo a saltare qualche cifra di mezzo.
- */
-private const val ROLL_FAST_MS = 200
-
 /** Un balzo piu' vecchio di cosi' e' l'app tornata in primo piano dopo un
  * po', non un ticchettio: si salta di netto invece di inseguirlo scorrendo. */
 private const val ROLL_STALE_MS = 1500L
+
+/**
+ * Passo e durata di un giro del rullo libero per un gruppo che ticchetta da
+ * solo piu' di un passo a ogni cambio (i centesimi del cronometro): mentre
+ * corre non insegue il valore vero, scorre a velocita' costante in un loop
+ * continuo, senza mai fermarsi su una cifra - altrimenti a quella velocita'
+ * le cifre non si leggono comunque, tanto vale scorrere libero. Il tempo
+ * mostrato resta quello esatto: e' solo l'animazione a non seguirlo cifra
+ * per cifra finche' non arriva una pausa o un azzeramento.
+ */
+private const val SPIN_STEP = 5f
+private const val SPIN_STEP_MS = 50
+
+/**
+ * La frenata di un gruppo "libero" quando si ferma (pausa o azzeramento):
+ * rallenta invece di scattare di colpo come i normali passi (ROLL_EASING),
+ * il contrario esatto - qui la corsa deve spegnersi dolcemente.
+ */
+private val SETTLE_EASING = LinearOutSlowInEasing
 
 /** Un gruppo di cifre consecutive (le ore, i minuti, ...) che scorre insieme. */
 private class DigitGroup(val start: Int, val len: Int, val mod: Int)
@@ -100,6 +112,16 @@ private fun valueOf(text: String, g: DigitGroup): Int =
 /** Il punto piu' vicino a [current] che rappresenta [value] sul cerchio [mod]. */
 private fun nearestCongruent(current: Float, value: Int, mod: Int): Float =
     value + ((current - value) / mod).roundToInt() * mod.toFloat()
+
+/**
+ * Il primo punto >= [current] che rappresenta [value] sul cerchio [mod]:
+ * mai indietro. Serve a fermare un rullo che corre libero senza che sembri
+ * tornare indietro per raggiungere la cifra vera.
+ */
+private fun forwardCongruent(current: Float, value: Int, mod: Int): Float {
+    val laps = ((current - value) / mod).let { if (it <= 0f) 0f else ceil(it) }
+    return value + laps * mod
+}
 
 /**
  * Testo dot-matrix: la stessa griglia di punti della Glyph Matrix, disegnata su Canvas.
@@ -151,6 +173,14 @@ fun DotText(
     // Fino a quando un rullo e' occupato a scorrere: mentre lo e', i cambi
     // successivi si saltano invece di interromperlo con uno snap.
     val busyUntil = remember(shape, groupMods) { LongArray(groups.size) }
+    // Un gruppo "veloce" (i centesimi) resta segnato tale per tutta la vita
+    // di questo DotText, cosi' anche alla pausa/azzeramento si sa che deve
+    // fermarsi solo in avanti invece che nella direzione piu' vicina.
+    val fast = remember(shape, groupMods) { BooleanArray(groups.size) }
+    // Il loop che fa scorrere libero un gruppo "veloce": va fermato appena
+    // arriva una pausa o un azzeramento, altrimenti continuerebbe a
+    // ripartire in gara con il rullo di atterraggio.
+    val spinJob = remember(shape, groupMods) { arrayOfNulls<Job>(groups.size) }
     var previous by remember(shape) { mutableStateOf(text) }
 
     // Le animazioni vivono nello scope del composable, non in quello dell'effetto:
@@ -163,13 +193,53 @@ fun DotText(
             val now = System.currentTimeMillis()
             groups.forEachIndexed { i, g ->
                 val to = valueOf(text, g)
+
+                if (forceRoll) {
+                    // Ferma il rullo libero se ce n'e' uno in corsa e atterra
+                    // sulla cifra vera: per un gruppo "veloce" sempre in
+                    // avanti (mai nella direzione piu' vicina, altrimenti
+                    // dopo aver corso in un verso sembra tornare indietro),
+                    // rallentando invece di scattare di colpo come i normali
+                    // passi.
+                    spinJob[i]?.cancel()
+                    spinJob[i] = null
+                    lastChange[i] = now
+                    val target = if (fast[i]) forwardCongruent(rolls[i].value, to, g.mod)
+                    else nearestCongruent(rolls[i].value, to, g.mod)
+                    val easing = if (fast[i]) SETTLE_EASING else ROLL_EASING
+                    val distance = abs(target - rolls[i].value)
+                    scope.launch {
+                        if (distance > 0f) rolls[i].animateTo(target, tween(rollDuration(distance), easing = easing))
+                        rolls[i].snapTo(Math.floorMod(rolls[i].value.roundToInt(), g.mod).toFloat())
+                    }
+                    return@forEachIndexed
+                }
+
                 val from = valueOf(previous, g)
                 if (to == from) return@forEachIndexed
-                // Un rullo per questo gruppo e' gia' in corsa: lo si lascia
-                // finire invece di interromperlo con uno snap, altrimenti un
-                // gruppo che cambia piu' spesso della durata del proprio
-                // rullo (i centesimi) non arriverebbe mai a scorrere davvero.
-                if (!forceRoll && now < busyUntil[i]) return@forEachIndexed
+
+                // Quanto si sposta il gruppo da solo, in un tick: se piu' di
+                // un passo, ticchetta piu' in fretta di quanto la vista possa
+                // seguirlo cifra per cifra (i centesimi). Non insegue piu' il
+                // valore vero mentre corre: scorre libero e a velocita'
+                // costante finche' non arriva una pausa o un azzeramento (sopra).
+                val naturalStep = minOf(abs(to - from), g.mod - abs(to - from))
+                if (naturalStep > 1) {
+                    fast[i] = true
+                    if (spinJob[i]?.isActive != true) {
+                        spinJob[i] = scope.launch {
+                            while (true) {
+                                rolls[i].animateTo(rolls[i].value + SPIN_STEP, tween(SPIN_STEP_MS, easing = LinearEasing))
+                                rolls[i].snapTo(Math.floorMod(rolls[i].value.roundToInt(), g.mod).toFloat())
+                            }
+                        }
+                    }
+                    return@forEachIndexed
+                }
+
+                // Gruppo lento (secondi, minuti, ore): un rullo alla volta,
+                // che insegue il valore vero.
+                if (now < busyUntil[i]) return@forEachIndexed
                 // Bersaglio assoluto invece che incrementale: anche se
                 // l'animazione precedente viene interrotta a meta', il rullo
                 // si ferma sempre esattamente su un numero, allineato agli altri.
@@ -177,22 +247,13 @@ fun DotText(
                 // Un balzo vecchio e' quasi certo l'app tornata in primo
                 // piano dopo un po', non un ticchettio normale.
                 val stale = lastChange[i] != 0L && now - lastChange[i] > ROLL_STALE_MS
-                val jump = !forceRoll && stale
                 lastChange[i] = now
-                // Quanto si sposta il gruppo da solo, in un tick non ancora
-                // rallentato da nessun rullo in corso: se piu' di un passo,
-                // ticchetta piu' in fretta di quanto la vista possa seguirlo
-                // cifra per cifra (i centesimi) e vuole una durata fissa e
-                // breve invece che scalata sulla distanza - si veda il
-                // commento su ROLL_FAST_MS.
-                val naturalStep = minOf(abs(to - from), g.mod - abs(to - from))
-                val duration = if (!forceRoll && naturalStep > 1) ROLL_FAST_MS
-                else rollDuration(abs(target - rolls[i].value))
-                if (!jump) busyUntil[i] = now + duration
-                scope.launch {
-                    if (jump) {
-                        rolls[i].snapTo(to.toFloat())
-                    } else {
+                if (stale) {
+                    scope.launch { rolls[i].snapTo(to.toFloat()) }
+                } else {
+                    val duration = rollDuration(abs(target - rolls[i].value))
+                    busyUntil[i] = now + duration
+                    scope.launch {
                         rolls[i].animateTo(target, tween(duration, easing = ROLL_EASING))
                         // Riporta il valore dentro un giro: altrimenti dopo ore
                         // di secondi cresce senza limite e perde precisione.

@@ -156,7 +156,11 @@ fun NothingFab(
     modifier: Modifier = Modifier,
 ) = FloatingActionButton(
     onClick = onClick,
-    modifier = modifier.navigationBarsPadding().padding(end = 24.dp, bottom = NothingBarMargin).size(NothingBarHeight),
+    // La pillola e' centrata e larga (cinque icone): con un margine destro
+    // uguale al suo (20.dp) i due bordi finiscono a toccarsi o quasi, a
+    // seconda della larghezza dello schermo. Un margine piu' stretto lascia
+    // un vero spazio fra i due.
+    modifier = modifier.navigationBarsPadding().padding(end = 8.dp, bottom = NothingBarMargin).size(NothingBarHeight),
     shape = CircleShape,
     containerColor = MaterialTheme.colorScheme.secondary,
     contentColor = MaterialTheme.colorScheme.onSecondary,

@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.noalarm.ui.theme.LocalDotOff
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -61,13 +62,13 @@ private fun rollDuration(steps: Float): Int =
 private const val ROLL_STALE_MS = 1500L
 
 /**
- * Passo e durata di un giro del rullo libero per un gruppo che ticchetta da
- * solo piu' di un passo a ogni cambio (i centesimi del cronometro): mentre
- * corre non insegue il valore vero, scorre a velocita' costante in un loop
- * continuo, senza mai fermarsi su una cifra - altrimenti a quella velocita'
- * le cifre non si leggono comunque, tanto vale scorrere libero. Il tempo
- * mostrato resta quello esatto: e' solo l'animazione a non seguirlo cifra
- * per cifra finche' non arriva una pausa o un azzeramento.
+ * Passo e durata di un giro del rullo libero per un gruppo dichiarato
+ * "veloce" da chi chiama (i centesimi del cronometro, l'unico caso: si
+ * ticchetta troppo in fretta perche' le cifre si leggano comunque, tanto
+ * vale scorrere libero). Mentre gira non insegue il valore vero, scorre a
+ * velocita' costante in un loop continuo, senza mai fermarsi su una cifra.
+ * Il tempo mostrato resta quello esatto: e' solo l'animazione a non
+ * seguirlo cifra per cifra finche' non arriva una pausa o un azzeramento.
  */
 private const val SPIN_STEP = 5f
 private const val SPIN_STEP_MS = 50
@@ -151,6 +152,13 @@ private fun forwardCongruent(current: Float, value: Int, mod: Int): Float {
  * rapidi da leggere e i salti lunghi. Serve a chi sa che il prossimo cambio e'
  * voluto e non un ticchettio: un azzeramento, o la sveglia in programma che
  * cambia.
+ *
+ * [spinGroups] sono gli indici (da sinistra) dei gruppi che, mentre
+ * [forceRoll] e' false, girano liberi a velocita' costante invece di
+ * inseguire il valore vero cifra per cifra - i centesimi del cronometro.
+ * Dichiarato da chi chiama invece che dedotto a runtime dal primo salto
+ * osservato: cosi' vale gia' dal primo tick, senza una finestra in cui una
+ * pausa arrivata troppo presto lo troverebbe ancora non classificato.
  */
 @Composable
 fun DotText(
@@ -166,6 +174,7 @@ fun DotText(
     animateChanges: Boolean = false,
     groupMods: List<Int> = emptyList(),
     forceRoll: Boolean = false,
+    spinGroups: Set<Int> = emptySet(),
 ) {
     val cols = DotFont.width(text, tracking)
     val blinkOn = if (blinkAccent) rememberNow(1000L) / 1000 % 2 == 0L else true
@@ -180,17 +189,6 @@ fun DotText(
     // Fino a quando un rullo e' occupato a scorrere: mentre lo e', i cambi
     // successivi si saltano invece di interromperlo con uno snap.
     val busyUntil = remember(shape, groupMods) { LongArray(groups.size) }
-    // Un gruppo "veloce" (i centesimi) resta segnato tale per tutta la vita
-    // di questo DotText, cosi' anche alla pausa/azzeramento si sa che deve
-    // fermarsi solo in avanti invece che nella direzione piu' vicina.
-    val fast = remember(shape, groupMods) { BooleanArray(groups.size) }
-    // Se il loop che fa scorrere libero un gruppo "veloce" e' attivo: si
-    // spegne mettendolo a false, controllato dal loop stesso a ogni giro -
-    // non bastava cancellare la coroutine, perche' un giro gia' avviato
-    // poteva completarsi comunque e ripartire subito dopo, in gara con il
-    // rullo di atterraggio appena lanciato (la causa della corsa che a
-    // volte non si fermava).
-    val spinning = remember(shape, groupMods) { BooleanArray(groups.size) }
     var previous by remember(shape) { mutableStateOf(text) }
 
     // Le animazioni vivono nello scope del composable, non in quello dell'effetto:
@@ -198,32 +196,53 @@ fun DotText(
     // le avrebbe interrotte tutte a meta' a ogni tick, lasciando ferme le cifre
     // piu' lente proprio mentre stavano scorrendo.
     val scope = rememberCoroutineScope()
-    // forceRoll e' una chiave anche lui: senza, quando cambia da solo (senza
-    // che cambi anche il testo, capita spesso proprio nell'istante in cui si
-    // preme pausa o play, perche' il valore vero non e' ancora avanzato)
-    // l'effetto non si riavvia e resta con la versione vecchia - un rullo
-    // libero poteva restare in corsa dopo la pausa (mai spento) o partire
-    // in ritardo dopo il play.
+
+    // Il motore del rullo libero: un effetto a se', appeso solo a
+    // spinGroups/forceRoll invece che al testo, cosi' parte o si ferma nello
+    // stesso istante in cui forceRoll cambia, non quando (forse) cambia
+    // anche il testo nella stessa ricomposizione - quell'ambiguita' era la
+    // causa del rullo che a volte non partiva o partiva in ritardo. Vive
+    // nello scope proprio dell'effetto apposta: quando forceRoll torna vero
+    // Compose cancella per davvero le coroutine in corsa, invece di un flag
+    // controllato a mano che un giro gia' avviato poteva superare in gara.
+    if (spinGroups.isNotEmpty()) {
+        LaunchedEffect(spinGroups, forceRoll) {
+            if (forceRoll) return@LaunchedEffect
+            coroutineScope {
+                spinGroups.forEach { i ->
+                    val g = groups.getOrNull(i) ?: return@forEach
+                    launch {
+                        while (true) {
+                            rolls[i].animateTo(rolls[i].value + SPIN_STEP, tween(SPIN_STEP_MS, easing = LinearEasing))
+                            rolls[i].snapTo(Math.floorMod(rolls[i].value.roundToInt(), g.mod).toFloat())
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     LaunchedEffect(text, animateChanges, forceRoll) {
         if (animateChanges && previous.length == text.length) {
             val now = System.currentTimeMillis()
             groups.forEachIndexed { i, g ->
                 val to = valueOf(text, g)
+                val isSpin = i in spinGroups
 
                 if (forceRoll) {
-                    // Ferma il rullo libero se ce n'e' uno in corsa e atterra
-                    // sulla cifra vera: per un gruppo "veloce" sempre in
-                    // avanti (mai nella direzione piu' vicina, altrimenti
+                    // Atterra sulla cifra vera: per un gruppo "libero" sempre
+                    // in avanti (mai nella direzione piu' vicina, altrimenti
                     // dopo aver corso in un verso sembra tornare indietro),
                     // rallentando invece di scattare di colpo come i normali
-                    // passi.
-                    spinning[i] = false
+                    // passi. Il motore sopra si ferma da solo (stesso
+                    // cambio di forceRoll nella sua chiave): qui basta
+                    // atterrare, senza bisogno di spegnere nulla a mano.
                     lastChange[i] = now
-                    val target = if (fast[i]) forwardCongruent(rolls[i].value, to, g.mod)
+                    val target = if (isSpin) forwardCongruent(rolls[i].value, to, g.mod)
                     else nearestCongruent(rolls[i].value, to, g.mod)
                     val distance = abs(target - rolls[i].value)
-                    val easing = if (fast[i]) SETTLE_EASING else ROLL_EASING
-                    val duration = if (fast[i]) SETTLE_MS else rollDuration(distance)
+                    val easing = if (isSpin) SETTLE_EASING else ROLL_EASING
+                    val duration = if (isSpin) SETTLE_MS else rollDuration(distance)
                     scope.launch {
                         if (distance > 0f) rolls[i].animateTo(target, tween(duration, easing = easing))
                         rolls[i].snapTo(Math.floorMod(rolls[i].value.roundToInt(), g.mod).toFloat())
@@ -231,33 +250,11 @@ fun DotText(
                     return@forEachIndexed
                 }
 
+                // Il motore dedicato ci pensa mentre gira libero.
+                if (isSpin) return@forEachIndexed
+
                 val from = valueOf(previous, g)
                 if (to == from) return@forEachIndexed
-
-                // Quanto si sposta il gruppo da solo, in un tick: se piu' di
-                // un passo, ticchetta piu' in fretta di quanto la vista possa
-                // seguirlo cifra per cifra (i centesimi). Non insegue piu' il
-                // valore vero mentre corre: scorre libero e a velocita'
-                // costante finche' non arriva una pausa o un azzeramento (sopra).
-                val naturalStep = minOf(abs(to - from), g.mod - abs(to - from))
-                if (naturalStep > 1) {
-                    fast[i] = true
-                    if (!spinning[i]) {
-                        spinning[i] = true
-                        scope.launch {
-                            // Il flag e' controllato a ogni giro, non solo
-                            // all'avvio: se nel frattempo arriva una pausa
-                            // che lo spegne, il loop esce invece di
-                            // scorrere ancora un giro e ripartire.
-                            while (spinning[i]) {
-                                rolls[i].animateTo(rolls[i].value + SPIN_STEP, tween(SPIN_STEP_MS, easing = LinearEasing))
-                                if (!spinning[i]) break
-                                rolls[i].snapTo(Math.floorMod(rolls[i].value.roundToInt(), g.mod).toFloat())
-                            }
-                        }
-                    }
-                    return@forEachIndexed
-                }
 
                 // Gruppo lento (secondi, minuti, ore): un rullo alla volta,
                 // che insegue il valore vero.

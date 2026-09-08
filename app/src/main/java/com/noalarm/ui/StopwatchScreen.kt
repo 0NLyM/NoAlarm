@@ -61,6 +61,9 @@ fun StopwatchScreen() {
             // scorre visibilmente fino a fermarsi invece di saltarci di colpo
             // come i centesimi fanno mentre il cronometro corre.
             forceRoll = !sw.running,
+            // I centesimi sono sempre l'ultimo gruppo, in entrambi i formati
+            // (con o senza le ore): girano liberi mentre il cronometro corre.
+            spinGroups = setOf(stopwatchMods(shown).lastIndex),
         )
         Spacer(Modifier.height(24.dp))
         LazyColumn(

@@ -19,10 +19,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -175,6 +179,13 @@ private fun Home(requestedTab: String?, onTabConsumed: () -> Unit) {
         ) {
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
+                // Esclude la barra di navigazione: lo Scaffold di base la
+                // riserverebbe gia' nel content, e NothingFab (dentro
+                // ciascuna schermata) applica il suo navigationBarsPadding()
+                // - sommati, spingevano il tasto "+" sopra la pillola invece
+                // che alla sua stessa altezza. NothingBottomBar non ha
+                // questo problema perche' vive fuori da questo Scaffold.
+                contentWindowInsets = WindowInsets.safeDrawing.exclude(WindowInsets.navigationBars),
                 topBar = {
                     TopAppBar(
                         title = { Text(tab.title.uppercase(), style = MaterialTheme.typography.labelLarge) },

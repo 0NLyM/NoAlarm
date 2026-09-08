@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -71,6 +72,8 @@ import com.noalarm.data.BarAppearance
 import com.noalarm.data.Store
 import com.noalarm.ui.AlarmScreen
 import com.noalarm.ui.CalendarScreen
+import com.noalarm.ui.NothingBarHeight
+import com.noalarm.ui.NothingBarMargin
 import com.noalarm.ui.SettingsScreen
 import com.noalarm.ui.StopwatchScreen
 import com.noalarm.ui.TimerScreen
@@ -257,7 +260,11 @@ private fun NothingBottomBar(
     Box(
         modifier
             .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(horizontal = 20.dp, vertical = NothingBarMargin)
+            // Altezza fissata alla stessa costante del FAB, non lasciata al
+            // conto di riga+padding interni: cosi' anche cambiando quelli in
+            // futuro il centro della pillola resta dov'era.
+            .height(NothingBarHeight)
             .clip(RoundedCornerShape(50))
             .onGloballyPositioned { barPosition = it.positionInRoot() },
     ) {

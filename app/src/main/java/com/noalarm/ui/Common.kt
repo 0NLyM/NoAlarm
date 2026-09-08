@@ -134,15 +134,19 @@ fun DotIconButton(
 }
 
 /**
+ * Altezza e margine dal basso condivisi dalla pillola del menu
+ * (NothingBottomBar, in MainActivity) e dal tasto "+" (NothingFab): stessa
+ * fonte per entrambi, non due copie dello stesso numero - un domani non si
+ * puo' piu' spostare l'uno senza spostare anche l'altro.
+ */
+val NothingBarHeight = 60.dp
+val NothingBarMargin = 12.dp
+
+/**
  * Il tasto "+" flottante di sveglia, orologio internazionale, timer e
  * calendario: rotondo e agganciato in basso a destra, allineato in
  * orizzontale con la pillola del menu invece che sospeso piu' in alto - le
  * due file si leggono come un unico livello di comandi.
- *
- * L'altezza (60.dp) e il margine dal basso (12.dp, dopo lo stesso
- * navigationBarsPadding) sono identici a quelli della pillola in
- * NothingBottomBar - non un valore a meta' calcolato a occhio, cosi' i due
- * centri coincidono per costruzione invece che per approssimazione.
  */
 @Composable
 fun NothingFab(
@@ -152,7 +156,7 @@ fun NothingFab(
     modifier: Modifier = Modifier,
 ) = FloatingActionButton(
     onClick = onClick,
-    modifier = modifier.navigationBarsPadding().padding(end = 24.dp, bottom = 12.dp).size(60.dp),
+    modifier = modifier.navigationBarsPadding().padding(end = 24.dp, bottom = NothingBarMargin).size(NothingBarHeight),
     shape = CircleShape,
     containerColor = MaterialTheme.colorScheme.secondary,
     contentColor = MaterialTheme.colorScheme.onSecondary,

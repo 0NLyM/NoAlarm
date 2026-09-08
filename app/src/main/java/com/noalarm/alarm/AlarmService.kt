@@ -233,7 +233,6 @@ class AlarmService : Service() {
         ringing.value = 0L
         if (!keepGlyph) GlyphController.stop()
         WearBridge.stopOnWatches(this)
-        NotificationHelper.showUpcoming(this, AlarmScheduler.next())
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }

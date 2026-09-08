@@ -14,6 +14,10 @@ class AlarmReceiver : BroadcastReceiver() {
                 NotificationHelper.showBedtime(context, Store.settings.value.bedtimeReminderMinutes)
                 AlarmScheduler.scheduleBedtime(context)
             }
+            AlarmScheduler.ACTION_REMIND -> {
+                val id = intent.getLongExtra(AlarmScheduler.EXTRA_ID, 0L)
+                Store.alarm(id)?.let { NotificationHelper.showAlarmReminder(context, it) }
+            }
             else -> {
                 val id = intent.getLongExtra(AlarmScheduler.EXTRA_ID, 0L)
                 val alarm = Store.alarm(id) ?: return

@@ -546,6 +546,11 @@ private fun AlarmEditor(
                 }
             }
             StepperRow(
+                "Notifica di preavviso",
+                if (draft.reminderMinutes == 0) "Mai" else "${draft.reminderMinutes} min prima",
+                0, 180, draft.reminderMinutes,
+            ) { draft = draft.copy(reminderMinutes = it) }
+            StepperRow(
                 "Silenzia dopo",
                 if (draft.autoSilenceMinutes == 0) "Mai" else "${draft.autoSilenceMinutes} min",
                 0, 60, draft.autoSilenceMinutes,

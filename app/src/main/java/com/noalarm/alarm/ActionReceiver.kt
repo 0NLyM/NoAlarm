@@ -22,7 +22,6 @@ class ActionReceiver : BroadcastReceiver() {
                     Store.updateAlarm(id) { it.copy(snoozedUntil = 0L) }
                     Store.alarm(id)?.let { AlarmScheduler.schedule(context, it) }
                     NotificationHelper.cancelSnoozed(context, id)
-                    NotificationHelper.showUpcoming(context, AlarmScheduler.next())
                 }
             }
             SKIP_NEXT -> {
@@ -33,7 +32,6 @@ class ActionReceiver : BroadcastReceiver() {
                     Store.updateAlarm(id) { it.copy(enabled = false) }
                 }
                 Store.alarm(id)?.let { AlarmScheduler.schedule(context, it) }
-                NotificationHelper.showUpcoming(context, AlarmScheduler.next())
             }
             TIMER_STOP -> ClockService.timerStop(context, id)
             TIMER_ADD -> ClockService.timerAdd(context, id, value)

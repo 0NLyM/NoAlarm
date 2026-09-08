@@ -17,6 +17,7 @@ object AlarmScheduler {
 
     const val EXTRA_ID = "alarm_id"
     const val ACTION_RING = "com.noalarm.RING"
+    const val ACTION_REMIND = "com.noalarm.REMIND"
     const val ACTION_BEDTIME = "com.noalarm.BEDTIME"
     private const val BEDTIME_ID = -1L
 
@@ -48,7 +49,6 @@ object AlarmScheduler {
         pruneExpired(c)
         Store.alarms.value.forEach { schedule(c, it) }
         scheduleBedtime(c)
-        NotificationHelper.showUpcoming(c, next())
     }
 
     fun schedule(c: Context, alarm: Alarm) {
@@ -56,29 +56,47 @@ object AlarmScheduler {
         val at = alarm.nextTrigger()
         if (at == null) {
             manager(c).cancel(pi)
-            return
+        } else {
+            val show = PendingIntent.getActivity(
+                c, alarm.id.hashCode(), Intent(c, MainActivity::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            // setAlarmClock: esatta, ignora Doze e compare nella status bar del sistema.
+            manager(c).setAlarmClock(AlarmManager.AlarmClockInfo(at, show), pi)
         }
-        val show = PendingIntent.getActivity(
-            c, alarm.id.hashCode(), Intent(c, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        // setAlarmClock: esatta, ignora Doze e compare nella status bar del sistema.
-        manager(c).setAlarmClock(AlarmManager.AlarmClockInfo(at, show), pi)
+        scheduleReminder(c, alarm, at)
     }
 
-    fun cancel(c: Context, id: Long) = manager(c).cancel(pending(c, id, ACTION_RING))
+    /**
+     * Notifica di preavviso, quanti minuti prima decide la sveglia stessa
+     * (0 = nessuna): a differenza della vecchia notifica sempre presente,
+     * questa e' un singolo colpo programmato al suo istante esatto, non
+     * qualcosa che resta in tendina finche' non cambia qualcosa.
+     */
+    private fun scheduleReminder(c: Context, alarm: Alarm, at: Long?) {
+        val pi = pending(c, alarm.id, ACTION_REMIND)
+        val remindAt = at?.minus(alarm.reminderMinutes * 60_000L)
+        if (remindAt == null || alarm.reminderMinutes <= 0 || remindAt <= System.currentTimeMillis()) {
+            manager(c).cancel(pi)
+        } else {
+            manager(c).setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, remindAt, pi)
+        }
+    }
 
-    /** Salva la sveglia, la riprogramma e aggiorna la notifica di imminenza. */
+    fun cancel(c: Context, id: Long) {
+        manager(c).cancel(pending(c, id, ACTION_RING))
+        manager(c).cancel(pending(c, id, ACTION_REMIND))
+    }
+
+    /** Salva la sveglia e la riprogramma, promemoria compreso. */
     fun save(c: Context, alarm: Alarm) {
         Store.putAlarm(alarm)
         schedule(c, alarm)
-        NotificationHelper.showUpcoming(c, next())
     }
 
     fun delete(c: Context, id: Long) {
         cancel(c, id)
         Store.removeAlarm(id)
-        NotificationHelper.showUpcoming(c, next())
     }
 
     /** La prossima sveglia che suonera', con il suo istante. */

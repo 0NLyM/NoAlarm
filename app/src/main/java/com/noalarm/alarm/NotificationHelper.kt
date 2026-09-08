@@ -90,29 +90,29 @@ object NotificationHelper {
             .build()
     }
 
-    fun showUpcoming(c: Context, next: Pair<Alarm, Long>?) {
-        val nm = NotificationManagerCompat.from(c)
-        if (next == null) {
-            nm.cancel(ID_UPCOMING)
-            return
-        }
-        val (alarm, at) = next
+    /**
+     * Preavviso di questa sveglia, programmato dal sistema esattamente
+     * [Alarm.reminderMinutes] prima del suono: un solo colpo, non una
+     * notifica che resta li' finche' non cambia qualcosa.
+     */
+    fun showAlarmReminder(c: Context, alarm: Alarm) {
         val s = Store.settings.value
         val n = NotificationCompat.Builder(c, CH_UPCOMING)
             .setSmallIcon(R.drawable.ic_stat_alarm)
-            .setContentTitle("${Format.dayOf(at)} ${Format.hhmm(alarm.hour, alarm.minute, s.use24h)}")
-            .setContentText(alarm.label.ifBlank { "Prossima sveglia ${Format.until(at)}" })
+            .setContentTitle("Sveglia alle ${Format.hhmm(alarm.hour, alarm.minute, s.use24h)}")
+            .setContentText(
+                "Fra ${alarm.reminderMinutes} min" +
+                    (if (alarm.label.isBlank()) "" else " · ${alarm.label}")
+            )
             .setContentIntent(open(c, MainActivity.TAB_ALARM))
-            .setOngoing(false)
-            .setShowWhen(false)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setAutoCancel(true)
             .addAction(
                 0,
                 if (alarm.repeating) "IGNORA UNA VOLTA" else "ELIMINA",
                 action(c, ActionReceiver.SKIP_NEXT, alarm.id),
             )
             .build()
-        runCatching { nm.notify(ID_UPCOMING, n) }
+        runCatching { NotificationManagerCompat.from(c).notify(ID_UPCOMING + alarm.id.hashCode(), n) }
     }
 
     fun showSnoozed(c: Context, alarm: Alarm, until: Long) {

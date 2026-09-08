@@ -48,6 +48,8 @@ data class Alarm(
     val skipNext: Boolean = false,
     /** > 0 quando la sveglia e' posticipata: istante del prossimo squillo. */
     val snoozedUntil: Long = 0L,
+    /** Notifica di preavviso questi minuti prima del suono. 0 = nessuna. */
+    val reminderMinutes: Int = 60,
 ) {
     val repeating get() = days.isNotEmpty() && dateEpochDay == 0L
     val onDate get() = dateEpochDay > 0L

@@ -123,6 +123,7 @@ object Store {
         put("snoozeLimit", a.snoozeLimit)
         put("glyph", a.glyph); put("glyphStyle", a.glyphStyle.name)
         put("skipNext", a.skipNext); put("snoozedUntil", a.snoozedUntil)
+        put("reminderMinutes", a.reminderMinutes)
     }
 
     private fun alarmOf(o: JSONObject) = Alarm(
@@ -145,6 +146,7 @@ object Store {
             .getOrDefault(GlyphStyle.CYCLE),
         skipNext = o.optBoolean("skipNext", false),
         snoozedUntil = o.optLong("snoozedUntil", 0L),
+        reminderMinutes = o.optInt("reminderMinutes", 60),
     )
 
     private fun json(t: TimerItem) = JSONObject().apply {

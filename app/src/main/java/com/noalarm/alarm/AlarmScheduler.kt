@@ -20,6 +20,8 @@ object AlarmScheduler {
     const val ACTION_REMIND = "com.noalarm.REMIND"
     const val ACTION_BEDTIME = "com.noalarm.BEDTIME"
     private const val BEDTIME_ID = -1L
+    /** Sveglia vera gestita dalla routine del sonno, all'orario di "Sveglia". */
+    const val BEDTIME_WAKE_ID = -2L
 
     private fun manager(c: Context) = c.getSystemService(AlarmManager::class.java)
 
@@ -109,10 +111,27 @@ object AlarmScheduler {
         val pi = pending(c, BEDTIME_ID, ACTION_BEDTIME)
         if (!s.bedtimeEnabled) {
             manager(c).cancel(pi)
+            delete(c, BEDTIME_WAKE_ID)
             return
         }
         val at = nextOccurrence(s.bedtimeHour, s.bedtimeMinute, s.bedtimeDays, s.bedtimeReminderMinutes)
         manager(c).setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
+
+        // Il promemoria sopra ricorda solo di andare a letto: senza una sveglia
+        // vera all'orario di "Sveglia" la routine non suona affatto e non compare
+        // come prossima sveglia. reminderMinutes = 0 perche' il preavviso della
+        // routine e' gia' quello di andare a dormire.
+        save(
+            c,
+            Alarm(
+                id = BEDTIME_WAKE_ID,
+                hour = s.wakeHour,
+                minute = s.wakeMinute,
+                days = s.bedtimeDays,
+                label = "Sveglia",
+                reminderMinutes = 0,
+            ),
+        )
     }
 
     private fun nextOccurrence(hour: Int, minute: Int, days: Set<Int>, minusMinutes: Int): Long {

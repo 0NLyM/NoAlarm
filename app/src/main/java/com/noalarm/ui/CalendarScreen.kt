@@ -57,7 +57,10 @@ import java.time.YearMonth
 @Composable
 fun CalendarScreen() {
     val context = LocalContext.current
-    val alarms by Store.alarms.collectAsStateWithLifecycle()
+    // Esclude la sveglia sintetica della routine del sonno: si modifica dal
+    // foglio Riposo, non come una sveglia qualunque nel calendario.
+    val alarms = Store.alarms.collectAsStateWithLifecycle().value
+        .filter { it.id != AlarmScheduler.BEDTIME_WAKE_ID }
     val settings by Store.settings.collectAsStateWithLifecycle()
 
     val today = remember { LocalDate.now() }

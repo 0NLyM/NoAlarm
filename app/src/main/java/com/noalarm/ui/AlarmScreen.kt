@@ -73,7 +73,10 @@ import java.time.LocalTime
 @Composable
 fun AlarmScreen() {
     val context = LocalContext.current
+    // Esclude la sveglia sintetica della routine del sonno: si modifica dal
+    // foglio Riposo, non come una sveglia qualunque in questo elenco.
     val alarms by Store.alarms.collectAsStateWithLifecycle()
+    val userAlarms = alarms.filter { it.id != AlarmScheduler.BEDTIME_WAKE_ID }
     val settings by Store.settings.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Alarm?>(null) }
     var bedtime by remember { mutableStateOf(false) }
@@ -139,7 +142,7 @@ fun AlarmScreen() {
                 }
             }
 
-            items(alarms, key = { it.id }) { alarm ->
+            items(userAlarms, key = { it.id }) { alarm ->
                 Box(Modifier.padding(horizontal = 16.dp)) {
                     AlarmRow(
                         alarm = alarm,
@@ -156,7 +159,7 @@ fun AlarmScreen() {
                 }
             }
 
-            if (alarms.isEmpty()) item {
+            if (userAlarms.isEmpty()) item {
                 Text(
                     "Tocca + per creare la prima sveglia.",
                     Modifier.padding(24.dp),

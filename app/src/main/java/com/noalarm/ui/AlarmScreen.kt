@@ -6,14 +6,21 @@ import android.media.RingtoneManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -195,18 +202,14 @@ fun AlarmScreen() {
 
         // Fuori dal foglio di modifica, che nel frattempo si e' gia' chiuso:
         // si puo' continuare a usare il resto della schermata mentre e' visibile.
-        recentlyDeleted?.let { alarm ->
-            Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp).padding(bottom = 176.dp)) {
-                UndoBar(
-                    alarm = alarm,
-                    onUndo = {
-                        AlarmScheduler.save(context, alarm.copy(enabled = true, snoozedUntil = 0L))
-                        recentlyDeleted = null
-                    },
-                    onExpire = { recentlyDeleted = null },
-                )
-            }
-        }
+        UndoBarHost(
+            alarm = recentlyDeleted,
+            onUndo = { alarm ->
+                AlarmScheduler.save(context, alarm.copy(enabled = true, snoozedUntil = 0L))
+                recentlyDeleted = null
+            },
+            onExpire = { recentlyDeleted = null },
+        )
     }
 
     editing?.let {
@@ -220,9 +223,33 @@ fun AlarmScreen() {
 }
 
 /**
+ * Ospita la UndoBar con la sua animazione di ingresso/uscita: sale da dietro
+ * il menu inferiore (disegnato sopra di lei, dopo, in MainActivity) invece
+ * di apparire di scatto, e vi si nasconde di nuovo alla chiusura. "shown"
+ * tiene l'ultima sveglia non nulla per tutta la durata dell'uscita, dato che
+ * "alarm" torna null nello stesso istante in cui l'animazione parte.
+ */
+@Composable
+fun BoxScope.UndoBarHost(alarm: Alarm?, onUndo: (Alarm) -> Unit, onExpire: () -> Unit) {
+    var shown by remember { mutableStateOf(alarm) }
+    LaunchedEffect(alarm) { if (alarm != null) shown = alarm }
+    AnimatedVisibility(
+        visible = alarm != null,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(horizontal = 16.dp)
+            .padding(bottom = NothingBarMargin + NothingBarHeight + 8.dp),
+        enter = slideInVertically(tween(220)) { it } + fadeIn(tween(220)),
+        exit = slideOutVertically(tween(220)) { it } + fadeOut(tween(160)),
+    ) {
+        shown?.let { a -> UndoBar(alarm = a, onUndo = { onUndo(a) }, onExpire = onExpire) }
+    }
+}
+
+/**
  * Conferma minimale dopo Elimina: qualche secondo per tornare indietro, poi si
- * chiude da sola. Riusata anche da CalendarScreen, che elimina sveglie allo
- * stesso modo.
+ * chiude da sola. Stessa forma e altezza della pillola del menu inferiore
+ * (NothingBottomBar), non piu' uno stretto rettangolo scollegato da lei.
  */
 @Composable
 fun UndoBar(alarm: Alarm, onUndo: () -> Unit, onExpire: () -> Unit) {
@@ -232,29 +259,35 @@ fun UndoBar(alarm: Alarm, onUndo: () -> Unit, onExpire: () -> Unit) {
         onExpire()
     }
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(50),
         color = Color.Black,
+        modifier = Modifier.height(NothingBarHeight),
     ) {
         // width(IntrinsicSize.Min): stretta quanto basta per il contenuto -
         // la barra sotto, pur larga quanto tutta la colonna, ne segue la
         // larghezza invece di allungarsi fino al bordo dello schermo.
-        Column(Modifier.width(IntrinsicSize.Min).padding(horizontal = 12.dp, vertical = 8.dp)) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("Sveglia eliminata", style = MaterialTheme.typography.bodySmall, color = Color.White)
-                TextButton(onClick = onUndo) {
-                    Text("ANNULLA", style = MaterialTheme.typography.labelSmall, color = Color.White)
+        Box(
+            Modifier.fillMaxHeight().width(IntrinsicSize.Min).padding(horizontal = 16.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Sveglia eliminata", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                    TextButton(onClick = onUndo) {
+                        Text("ANNULLA", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    }
                 }
+                Spacer(Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = { progress.value },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.White,
+                    trackColor = Color.White.copy(alpha = 0.25f),
+                )
             }
-            Spacer(Modifier.height(6.dp))
-            LinearProgressIndicator(
-                progress = { progress.value },
-                modifier = Modifier.fillMaxWidth(),
-                color = Color.White,
-                trackColor = Color.White.copy(alpha = 0.25f),
-            )
         }
     }
 }
@@ -437,6 +470,12 @@ private fun AlarmEditor(
     var draft by remember(alarm.id) { mutableStateOf(alarm) }
     LaunchedEffect(draft) { onDraftChange(draft) }
 
+    // Gruppi gia' usati da altre sveglie, per scegliere invece di riscrivere
+    // lo stesso nome ogni volta. Basta lo scatto di quando si apre il foglio.
+    val existingGroups = remember {
+        Store.alarms.value.mapNotNull { it.group.ifBlank { null } }.distinct().sorted()
+    }
+
     val ringtone = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == Activity.RESULT_OK) {
             val uri: Uri? = r.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
@@ -543,6 +582,30 @@ private fun AlarmEditor(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (existingGroups.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    existingGroups.forEach { name ->
+                        val selected = name == draft.group
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (selected) MaterialTheme.colorScheme.secondary
+                            else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = if (selected) MaterialTheme.colorScheme.onSecondary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            onClick = { draft = draft.copy(group = if (selected) "" else name) },
+                        ) {
+                            Text(
+                                name,
+                                Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    }
+                }
+            }
 
             RowItem(
                 title = "Suoneria",

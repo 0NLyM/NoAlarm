@@ -211,18 +211,14 @@ fun CalendarScreen() {
             modifier = Modifier.align(Alignment.BottomEnd),
         )
 
-        recentlyDeleted?.let { alarm ->
-            Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp).padding(bottom = 176.dp)) {
-                UndoBar(
-                    alarm = alarm,
-                    onUndo = {
-                        AlarmScheduler.save(context, alarm.copy(enabled = true, snoozedUntil = 0L))
-                        recentlyDeleted = null
-                    },
-                    onExpire = { recentlyDeleted = null },
-                )
-            }
-        }
+        UndoBarHost(
+            alarm = recentlyDeleted,
+            onUndo = { alarm ->
+                AlarmScheduler.save(context, alarm.copy(enabled = true, snoozedUntil = 0L))
+                recentlyDeleted = null
+            },
+            onExpire = { recentlyDeleted = null },
+        )
     }
 
     editing?.let {

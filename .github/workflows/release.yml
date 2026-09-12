@@ -76,12 +76,15 @@ jobs:
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           "$BT/apksigner" verify --verbose --print-certs \
             app/build/outputs/apk/release/app-release.apk
+          "$BT/apksigner" verify --verbose --print-certs \
+            wear/build/outputs/apk/release/wear-release.apk
 
       - name: Rinomina gli artefatti
         run: |
           V="${{ steps.v.outputs.version }}"
           mv app/build/outputs/apk/release/app-release.apk "NoAlarm-$V.apk"
           mv app/build/outputs/bundle/release/app-release.aab "NoAlarm-$V.aab"
+          mv wear/build/outputs/apk/release/wear-release.apk "NoAlarm-Watch-$V.apk"
 
       - name: Pulisci il keystore
         if: always()

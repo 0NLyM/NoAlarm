@@ -213,10 +213,15 @@ fun NothingSwitch(
     else MaterialTheme.colorScheme.surfaceContainerHigh
     val thumbColor = if (checked) MaterialTheme.colorScheme.surface
     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-    // 26.dp e' anche il massimo che sta senza schiacciarsi nei 32.dp di
-    // altezza del binario meno il padding: un pallino piu' grande verrebbe
-    // compresso in verticale invece di restare un cerchio.
-    val thumbSize = 26.dp
+    // Un pallino nero pieno su un binario chiaro appare otticamente piu'
+    // piccolo di uno grigio sull'omologo spento, a parita' di dimensione
+    // dichiarata (illusione da contrasto): un paio di dp in piu' da acceso
+    // la compensano. Il binario e' alto abbastanza (34.dp, padding 3.dp,
+    // 28.dp liberi) perche' anche il piu' grande dei due resti un cerchio
+    // perfetto invece di schiacciarsi in verticale.
+    val thumbSize = if (checked) 28.dp else 26.dp
+    // Interno largo 40.dp (46 - 2*3): a destra il pallino da 28.dp parte
+    // a 12.dp, quello da 26.dp a sinistra parte a 0.
     val thumbOffset by animateDpAsState(if (checked) 12.dp else 0.dp, tween(150), label = "switch-offset")
     val enabledAlpha = if (enabled) 1f else 0.4f
     // Il pallino resta sempre pieno: e' il vetro del binario a farsi
@@ -225,7 +230,7 @@ fun NothingSwitch(
 
     Box(
         modifier
-            .size(46.dp, 32.dp)
+            .size(46.dp, 34.dp)
             .clip(RoundedCornerShape(50))
             .background(trackColor.copy(alpha = trackAlpha))
             .let {
@@ -237,6 +242,7 @@ fun NothingSwitch(
                 else it
             }
             .padding(3.dp),
+        contentAlignment = Alignment.CenterStart,
     ) {
         Box(
             Modifier

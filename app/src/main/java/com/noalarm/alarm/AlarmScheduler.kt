@@ -109,9 +109,16 @@ object AlarmScheduler {
     fun scheduleBedtime(c: Context) {
         val s = Store.settings.value
         val pi = pending(c, BEDTIME_ID, ACTION_BEDTIME)
+
+        // Suoneria, vibrazione, glyph, rinvio... si personalizzano dal foglio
+        // Riposo come per qualunque sveglia: si parte da quella gia' salvata
+        // (se c'e') invece di ricrearla sempre uguale, altrimenti ogni
+        // modifica a bed/wake/giorni la resetterebbe ai valori di default.
+        val wake = Store.alarm(BEDTIME_WAKE_ID) ?: Alarm(id = BEDTIME_WAKE_ID, label = "Sveglia", reminderMinutes = 0)
+
         if (!s.bedtimeEnabled) {
             manager(c).cancel(pi)
-            delete(c, BEDTIME_WAKE_ID)
+            save(c, wake.copy(enabled = false))
             return
         }
         val at = nextOccurrence(s.bedtimeHour, s.bedtimeMinute, s.bedtimeDays, s.bedtimeReminderMinutes)
@@ -119,19 +126,8 @@ object AlarmScheduler {
 
         // Il promemoria sopra ricorda solo di andare a letto: senza una sveglia
         // vera all'orario di "Sveglia" la routine non suona affatto e non compare
-        // come prossima sveglia. reminderMinutes = 0 perche' il preavviso della
-        // routine e' gia' quello di andare a dormire.
-        save(
-            c,
-            Alarm(
-                id = BEDTIME_WAKE_ID,
-                hour = s.wakeHour,
-                minute = s.wakeMinute,
-                days = s.bedtimeDays,
-                label = "Sveglia",
-                reminderMinutes = 0,
-            ),
-        )
+        // come prossima sveglia.
+        save(c, wake.copy(hour = s.wakeHour, minute = s.wakeMinute, days = s.bedtimeDays, enabled = true))
     }
 
     private fun nextOccurrence(hour: Int, minute: Int, days: Set<Int>, minusMinutes: Int): Long {

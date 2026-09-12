@@ -213,10 +213,10 @@ fun NothingSwitch(
     else MaterialTheme.colorScheme.surfaceContainerHigh
     val thumbColor = if (checked) MaterialTheme.colorScheme.surface
     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-    // Un pallino nero pieno su un binario chiaro appare otticamente piu' piccolo
-    // di uno grigio sull'omologo spento, a parita' di dimensione dichiarata
-    // (illusione da contrasto): un paio di dp in piu' da acceso la compensano.
-    val thumbSize by animateDpAsState(if (checked) 28.dp else 26.dp, tween(150), label = "switch-size")
+    // 26.dp e' anche il massimo che sta senza schiacciarsi nei 32.dp di
+    // altezza del binario meno il padding: un pallino piu' grande verrebbe
+    // compresso in verticale invece di restare un cerchio.
+    val thumbSize = 26.dp
     val thumbOffset by animateDpAsState(if (checked) 12.dp else 0.dp, tween(150), label = "switch-offset")
     val enabledAlpha = if (enabled) 1f else 0.4f
     // Il pallino resta sempre pieno: e' il vetro del binario a farsi

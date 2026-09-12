@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -56,6 +57,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -142,20 +144,27 @@ fun AlarmScreen() {
                 }
             }
 
-            items(userAlarms, key = { it.id }) { alarm ->
-                Box(Modifier.padding(horizontal = 16.dp)) {
-                    AlarmRow(
-                        alarm = alarm,
-                        use24h = settings.use24h,
-                        order = settings.dayOrder(),
-                        onToggle = {
-                            AlarmScheduler.save(
-                                context,
-                                alarm.copy(enabled = it, snoozedUntil = 0L, skipNext = false),
-                            )
-                        },
-                        onClick = { editing = alarm },
-                    )
+            // Gruppo vuoto = nessun'intestazione, in cima; gli altri gruppi
+            // in ordine alfabetico, ciascuno con la sua etichetta.
+            userAlarms.groupBy { it.group }.toSortedMap().forEach { (group, inGroup) ->
+                if (group.isNotBlank()) item(key = "group_$group") {
+                    Box(Modifier.padding(horizontal = 16.dp)) { SectionLabel(group.uppercase()) }
+                }
+                items(inGroup, key = { it.id }) { alarm ->
+                    Box(Modifier.padding(horizontal = 16.dp)) {
+                        AlarmRow(
+                            alarm = alarm,
+                            use24h = settings.use24h,
+                            order = settings.dayOrder(),
+                            onToggle = {
+                                AlarmScheduler.save(
+                                    context,
+                                    alarm.copy(enabled = it, snoozedUntil = 0L, skipNext = false),
+                                )
+                            },
+                            onClick = { editing = alarm },
+                        )
+                    }
                 }
             }
 
@@ -223,24 +232,28 @@ fun UndoBar(alarm: Alarm, onUndo: () -> Unit, onExpire: () -> Unit) {
         onExpire()
     }
     Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(14.dp),
+        color = Color.Black,
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        // width(IntrinsicSize.Min): stretta quanto basta per il contenuto -
+        // la barra sotto, pur larga quanto tutta la colonna, ne segue la
+        // larghezza invece di allungarsi fino al bordo dello schermo.
+        Column(Modifier.width(IntrinsicSize.Min).padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Sveglia eliminata", style = MaterialTheme.typography.bodyMedium)
-                TextButton(onClick = onUndo) { Text("ANNULLA") }
+                Text("Sveglia eliminata", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                TextButton(onClick = onUndo) {
+                    Text("ANNULLA", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             LinearProgressIndicator(
                 progress = { progress.value },
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.secondary,
-                trackColor = MaterialTheme.colorScheme.outline,
+                color = Color.White,
+                trackColor = Color.White.copy(alpha = 0.25f),
             )
         }
     }
@@ -316,10 +329,11 @@ private fun BedtimeSheet(onDismiss: () -> Unit) = ModalBottomSheet(
 /**
  * Foglio di modifica di una sveglia, condiviso con la schermata Calendario.
  *
- * Salva in tempo reale invece che solo al tocco di "Salva": chiudere il
- * foglio in un modo qualunque - swipe compreso - non perde mai le modifiche.
- * L'unico modo di perdere davvero la sveglia resta il pulsante Elimina, e
- * anche li' per qualche secondo si puo' tornare indietro.
+ * Una sveglia gia' esistente salva in tempo reale: chiuderlo in un modo
+ * qualunque - swipe compreso - non perde mai le modifiche. Una sveglia
+ * nuova (aperta con "+", non ancora nello Store) invece non esiste finche'
+ * non si preme "Fatto": aprire il foglio e chiuderlo senza confermare non
+ * deve creare nulla.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -327,26 +341,36 @@ fun AlarmEditSheet(alarm: Alarm, onDismiss: () -> Unit, onDeleted: (Alarm) -> Un
     val context = LocalContext.current
     val settings by Store.settings.collectAsStateWithLifecycle()
     var current by remember(alarm.id) { mutableStateOf(alarm) }
+    val isNew = remember(alarm.id) { Store.alarm(alarm.id) == null }
 
     fun commit(a: Alarm) = AlarmScheduler.save(context, a.copy(enabled = true, snoozedUntil = 0L))
 
-    // Ammortizzato: riprogrammare nel sistema non e' gratuito, non ha senso
-    // rifarlo a ogni singolo frame mentre si trascina il carosello dell'ora.
-    // Finche' non si tocca nulla "current" resta uguale ad "alarm": aprire il
-    // foglio con "+" non deve gia' salvare/programmare una sveglia di default.
-    LaunchedEffect(current) {
-        if (current == alarm) return@LaunchedEffect
-        delay(400)
-        commit(current)
+    if (!isNew) {
+        // Ammortizzato: riprogrammare nel sistema non e' gratuito, non ha
+        // senso rifarlo a ogni singolo frame mentre si trascina il
+        // carosello dell'ora. Solo per una sveglia gia' salvata: su una
+        // nuova, salvare qui la creerebbe ancora prima di "Fatto".
+        LaunchedEffect(current) {
+            if (current == alarm) return@LaunchedEffect
+            delay(400)
+            commit(current)
+        }
     }
 
-    fun close() {
+    fun confirm() {
         commit(current)
         onDismiss()
     }
 
+    fun dismiss() {
+        // Una nuova non confermata si scarta; una gia' esistente e' gia'
+        // salvata (in tempo reale, o lo sta per essere): basta chiudere.
+        if (!isNew) commit(current)
+        onDismiss()
+    }
+
     ModalBottomSheet(
-        onDismissRequest = ::close,
+        onDismissRequest = ::dismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.background,
     ) {
@@ -355,10 +379,12 @@ fun AlarmEditSheet(alarm: Alarm, onDismiss: () -> Unit, onDeleted: (Alarm) -> Un
             use24h = settings.use24h,
             order = settings.dayOrder(),
             onDraftChange = { current = it },
-            onDone = ::close,
+            onDone = ::confirm,
             onDelete = {
-                AlarmScheduler.delete(context, current.id)
-                onDeleted(current)
+                if (!isNew) {
+                    AlarmScheduler.delete(context, current.id)
+                    onDeleted(current)
+                }
                 onDismiss()
             },
         )
@@ -506,6 +532,14 @@ private fun AlarmEditor(
                 value = draft.label,
                 onValueChange = { draft = draft.copy(label = it.take(24)) },
                 label = { Text("Etichetta") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = draft.group,
+                onValueChange = { draft = draft.copy(group = it.take(24)) },
+                label = { Text("Gruppo (opzionale)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -682,7 +716,7 @@ private fun NumberInputDialog(
     )
 }
 
-private fun glyphStyleLabel(style: GlyphStyle) = when (style) {
+fun glyphStyleLabel(style: GlyphStyle) = when (style) {
     GlyphStyle.CYCLE -> "Ciclo"
     GlyphStyle.CLOCK -> "Ora"
     GlyphStyle.BELL -> "Campanella"
@@ -691,7 +725,7 @@ private fun glyphStyleLabel(style: GlyphStyle) = when (style) {
 }
 
 @Composable
-private fun ringtoneName(uri: String?): String {
+fun ringtoneName(uri: String?): String {
     val context = LocalContext.current
     return remember(uri) {
         runCatching {

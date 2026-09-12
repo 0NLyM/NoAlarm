@@ -50,6 +50,8 @@ data class Alarm(
     val snoozedUntil: Long = 0L,
     /** Notifica di preavviso questi minuti prima del suono. 0 = nessuna. */
     val reminderMinutes: Int = 60,
+    /** Gruppo per organizzare l'elenco (es. "Lavoro", "Weekend"). Vuoto = nessun gruppo. */
+    val group: String = "",
 ) {
     val repeating get() = days.isNotEmpty() && dateEpochDay == 0L
     val onDate get() = dateEpochDay > 0L

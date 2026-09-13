@@ -68,5 +68,9 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
+    // play-services-wearable porta in transitiva un Fragment troppo vecchio
+    // per la lint di release (richiede >= 1.3.0), stesso problema gia' visto
+    // in app/build.gradle.kts: lo fissiamo esplicitamente.
+    implementation(libs.androidx.fragment.ktx)
     implementation(libs.play.services.wearable)
 }

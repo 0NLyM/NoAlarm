@@ -52,6 +52,8 @@ data class Alarm(
     val reminderMinutes: Int = 60,
     /** Gruppo per organizzare l'elenco (es. "Lavoro", "Weekend"). Vuoto = nessun gruppo. */
     val group: String = "",
+    /** Fa vibrare/squillare anche l'eco sul watch abbinato, se c'e'. */
+    val ringOnWatch: Boolean = true,
 ) {
     val repeating get() = days.isNotEmpty() && dateEpochDay == 0L
     val onDate get() = dateEpochDay > 0L
@@ -127,6 +129,8 @@ data class Settings(
     val showSeconds: Boolean = false,
     val defaultSnoozeMinutes: Int = 10,
     val defaultAutoSilenceMinutes: Int = 10,
+    /** Valore di partenza di [Alarm.ringOnWatch] per le sveglie nuove. */
+    val defaultRingOnWatch: Boolean = true,
     val volumeKeyAction: KeyAction = KeyAction.SNOOZE,
     val powerKeyAction: KeyAction = KeyAction.DISMISS,
     val flipAction: KeyAction = KeyAction.NONE,

@@ -125,6 +125,7 @@ object Store {
         put("skipNext", a.skipNext); put("snoozedUntil", a.snoozedUntil)
         put("reminderMinutes", a.reminderMinutes)
         put("group", a.group)
+        put("ringOnWatch", a.ringOnWatch)
     }
 
     private fun alarmOf(o: JSONObject) = Alarm(
@@ -149,6 +150,7 @@ object Store {
         snoozedUntil = o.optLong("snoozedUntil", 0L),
         reminderMinutes = o.optInt("reminderMinutes", 60),
         group = o.optString("group", ""),
+        ringOnWatch = o.optBoolean("ringOnWatch", true),
     )
 
     private fun json(t: TimerItem) = JSONObject().apply {
@@ -183,6 +185,7 @@ object Store {
         put("showSeconds", s.showSeconds)
         put("defaultSnoozeMinutes", s.defaultSnoozeMinutes)
         put("defaultAutoSilenceMinutes", s.defaultAutoSilenceMinutes)
+        put("defaultRingOnWatch", s.defaultRingOnWatch)
         put("volumeKeyAction", s.volumeKeyAction.name); put("powerKeyAction", s.powerKeyAction.name)
         put("flipAction", s.flipAction.name); put("shakeAction", s.shakeAction.name)
         put("glyphEnabled", s.glyphEnabled); put("glyphAppChannel", s.glyphAppChannel)
@@ -208,6 +211,7 @@ object Store {
         showSeconds = o.optBoolean("showSeconds", false),
         defaultSnoozeMinutes = o.optInt("defaultSnoozeMinutes", 10),
         defaultAutoSilenceMinutes = o.optInt("defaultAutoSilenceMinutes", 10),
+        defaultRingOnWatch = o.optBoolean("defaultRingOnWatch", true),
         volumeKeyAction = key(o, "volumeKeyAction", KeyAction.SNOOZE),
         powerKeyAction = key(o, "powerKeyAction", KeyAction.DISMISS),
         flipAction = key(o, "flipAction", KeyAction.NONE),

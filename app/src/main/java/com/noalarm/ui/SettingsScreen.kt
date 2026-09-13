@@ -73,9 +73,12 @@ fun SettingsScreen() {
             if (s.defaultAutoSilenceMinutes == 0) "Mai" else "${s.defaultAutoSilenceMinutes} min",
             0, 60, s.defaultAutoSilenceMinutes,
         ) { v -> Store.update { it.copy(defaultAutoSilenceMinutes = v) } }
+        SwitchRow("Suona anche sull'orologio", s.defaultRingOnWatch) { v ->
+            Store.update { it.copy(defaultRingOnWatch = v) }
+        }
         Text(
-            "Valgono per le sveglie nuove. Rinvio, passo dei pulsanti, minimo, massimo e "
-                + "numero di rinvii si regolano dentro ogni singola sveglia.",
+            "Valgono per le sveglie nuove. Rinvio, passo dei pulsanti, minimo, massimo, "
+                + "numero di rinvii e l'eco sul watch si regolano dentro ogni singola sveglia.",
             Modifier.padding(horizontal = 4.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -195,6 +195,7 @@ fun AlarmScreen() {
                     minute = now.minute,
                     snoozeMinutes = settings.defaultSnoozeMinutes,
                     autoSilenceMinutes = settings.defaultAutoSilenceMinutes,
+                    ringOnWatch = settings.defaultRingOnWatch,
                 )
             },
             modifier = Modifier.align(Alignment.BottomEnd),
@@ -627,6 +628,7 @@ private fun AlarmEditor(
 
             SwitchRow("Vibrazione", draft.vibrate) { draft = draft.copy(vibrate = it) }
             SwitchRow("Volume crescente", draft.gradualVolume) { draft = draft.copy(gradualVolume = it) }
+            SwitchRow("Suona anche sull'orologio", draft.ringOnWatch) { draft = draft.copy(ringOnWatch = it) }
             SwitchRow("Glyph Matrix mentre suona", draft.glyph) { draft = draft.copy(glyph = it) }
             if (draft.glyph) {
                 SectionLabel("Cosa mostra la matrice")

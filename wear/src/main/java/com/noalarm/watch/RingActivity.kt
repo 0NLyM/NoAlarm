@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
 import com.google.android.gms.wearable.Wearable
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -79,6 +80,7 @@ class RingActivity : ComponentActivity() {
     }
 
     private fun respond(path: String) {
+        NotificationManagerCompat.from(this).cancel(RingListenerService.ID_RING)
         if (id == 0L) return // "Prova" dalla schermata principale: nessun telefono da avvisare.
         val out = ByteArrayOutputStream()
         DataOutputStream(out).use { it.writeLong(id) }

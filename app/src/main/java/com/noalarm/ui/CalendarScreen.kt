@@ -206,6 +206,7 @@ fun CalendarScreen() {
                     dateEpochDay = selected.toEpochDay(),
                     snoozeMinutes = settings.defaultSnoozeMinutes,
                     autoSilenceMinutes = settings.defaultAutoSilenceMinutes,
+                    ringOnWatch = settings.defaultRingOnWatch,
                 )
             },
             modifier = Modifier.align(Alignment.BottomEnd),

@@ -80,7 +80,7 @@ class AlarmService : Service() {
         play(alarm)
         if (alarm.vibrate) vibrate()
         if (alarm.glyph) GlyphController.ring(this, alarm.label, alarm.glyphStyle)
-        WearBridge.ringOnWatches(this, alarm)
+        if (alarm.ringOnWatch) WearBridge.ringOnWatches(this, alarm)
         listenScreenOff()
         listenMotion()
 

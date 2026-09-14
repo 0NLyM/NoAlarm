@@ -22,9 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
-import com.google.android.gms.wearable.Wearable
-import java.io.ByteArrayOutputStream
-import java.io.DataOutputStream
 
 /** Eco della sveglia sul watch: vibra e mostra spegni/posticipa, che rimandano l'esito al telefono. */
 class RingActivity : ComponentActivity() {
@@ -48,8 +45,8 @@ class RingActivity : ComponentActivity() {
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Text(text.ifBlank { "Sveglia" }, style = MaterialTheme.typography.titleMedium)
-                    Button(onClick = { respond(RingListenerService.PATH_SNOOZE); finish() }) { Text("Posticipa") }
-                    Button(onClick = { respond(RingListenerService.PATH_DISMISS); finish() }) { Text("Spegni") }
+                    Button(onClick = { respond(BridgeService.ACTION_SNOOZE); finish() }) { Text("Posticipa") }
+                    Button(onClick = { respond(BridgeService.ACTION_DISMISS); finish() }) { Text("Spegni") }
                 }
             }
         }
@@ -79,16 +76,10 @@ class RingActivity : ComponentActivity() {
         vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400, 1000), 0))
     }
 
-    private fun respond(path: String) {
-        NotificationManagerCompat.from(this).cancel(RingListenerService.ID_RING)
+    private fun respond(action: Int) {
+        NotificationManagerCompat.from(this).cancel(BridgeService.ID_RING)
         if (id == 0L) return // "Prova" dalla schermata principale: nessun telefono da avvisare.
-        val out = ByteArrayOutputStream()
-        DataOutputStream(out).use { it.writeLong(id) }
-        val payload = out.toByteArray()
-        val messages = Wearable.getMessageClient(this)
-        Wearable.getNodeClient(this).connectedNodes.addOnSuccessListener { nodes ->
-            nodes.forEach { node -> messages.sendMessage(node.id, path, payload) }
-        }
+        BridgeService.respond(action)
     }
 
     override fun onDestroy() {

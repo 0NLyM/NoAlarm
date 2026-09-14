@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Eco della sveglia sul watch via Bluetooth diretto (vedi wear/WearBridge.kt). -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <!-- Glyph Matrix (Nothing Phone 3) -->
     <uses-permission android:name="com.nothing.ketchum.permission.ENABLE" />
@@ -86,16 +88,6 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Timer e cronometro visibili nella notifica persistente" />
-        </service>
-
-        <!-- Riceve dal watch WearOS abbinato lo spegni/posticipa dell'eco della sveglia. -->
-        <service
-            android:name=".wear.PhoneWearService"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
-                <data android:scheme="wear" android:host="*" android:pathPrefix="/noalarm" />
-            </intent-filter>
         </service>
 
         <receiver

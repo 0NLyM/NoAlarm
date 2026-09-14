@@ -12,9 +12,17 @@
         android:label="@string/app_name"
         android:theme="@android:style/Theme.DeviceDefault">
 
-        <!-- Companion: si appoggia al telefono per sapere quando suonare, non ha una
-             sua copia delle sveglie ne' le programma da solo. -->
-        <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
+        <!--
+          Riguarda solo il meccanismo di Play Store per l'installazione automatica
+          abbinata al telefono, non la logica dell'app (che infatti resta una
+          companion: si appoggia al telefono per sapere quando suonare, non ha una
+          sua copia delle sveglie ne' le programma da solo). Con "false" alcuni
+          launcher Wear OS (incluso quello di Ticwatch/Mobvoi) nascondono dal
+          drawer un'app sideloaded perche' non risulta abbinata tramite quel
+          meccanismo, anche se e' installata per davvero: "true" la rende visibile
+          subito come qualunque altra app sideload.
+        -->
+        <meta-data android:name="com.google.android.wearable.standalone" android:value="true" />
 
         <activity
             android:name=".MainActivity"

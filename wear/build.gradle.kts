@@ -32,8 +32,8 @@ android {
         // Wear OS 3+: e' la versione minima con cui la Data Layer API e' affidabile.
         minSdk = 30
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
     }
 
     signingConfigs {

@@ -13,6 +13,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -168,8 +169,21 @@ class BridgeService : Service() {
 
         @Volatile private var instance: BridgeService? = null
 
+        /**
+         * Senza il permesso, avviare comunque il servizio e' un crash
+         * garantito: startForegroundService() impone di chiamare
+         * startForeground() a stretto giro, ma onStartCommand() senza
+         * permesso si fermerebbe subito senza averlo mai chiamato. Meglio
+         * non partire affatto - riparte da solo (MainActivity, BootReceiver)
+         * appena il permesso c'e'.
+         */
         fun start(context: Context) {
-            ContextCompat.startForegroundService(context, Intent(context, BridgeService::class.java))
+            val allowed = Build.VERSION.SDK_INT < 31 ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+                    PackageManager.PERMISSION_GRANTED
+            if (allowed) {
+                ContextCompat.startForegroundService(context, Intent(context, BridgeService::class.java))
+            }
         }
 
         fun respond(action: Int) = instance?.respond(action)

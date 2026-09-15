@@ -50,11 +50,9 @@ class BridgeService : Service() {
         )
     }
 
-    @SuppressLint("MissingPermission") // verificato prima di avviare il service, vedi start()
+    @SuppressLint("MissingPermission") // verificato da hasPermission()
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (!hasPermission(this)) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -169,6 +167,15 @@ class BridgeService : Service() {
 
         @Volatile private var instance: BridgeService? = null
 
+        // Sotto la 31 BLUETOOTH_CONNECT non esiste come permesso runtime: il
+        // Bluetooth e' coperto dai permessi normali (concessi all'installazione),
+        // e checkSelfPermission su una stringa che l'OS non conosce puo' dare
+        // "negato" anche quando in realta' non serve alcun consenso.
+        private fun hasPermission(context: Context) =
+            Build.VERSION.SDK_INT < 31 ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+                    PackageManager.PERMISSION_GRANTED
+
         /**
          * Senza il permesso, avviare comunque il servizio e' un crash
          * garantito: startForegroundService() impone di chiamare
@@ -178,10 +185,7 @@ class BridgeService : Service() {
          * appena il permesso c'e'.
          */
         fun start(context: Context) {
-            val allowed = Build.VERSION.SDK_INT < 31 ||
-                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
-                    PackageManager.PERMISSION_GRANTED
-            if (allowed) {
+            if (hasPermission(context)) {
                 ContextCompat.startForegroundService(context, Intent(context, BridgeService::class.java))
             }
         }

@@ -19,7 +19,7 @@
     <application
         android:allowBackup="false"
         android:label="@string/app_name"
-        android:theme="@android:style/Theme.DeviceDefault.Black.NoActionBar">
+        android:theme="@style/Theme.NoAlarmWatch">
 
         <!--
           Riguarda solo il meccanismo di Play Store per l'installazione automatica
@@ -49,7 +49,7 @@
             android:launchMode="singleInstance"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
-            android:theme="@android:style/Theme.DeviceDefault.Black.NoActionBar" />
+            android:theme="@style/Theme.NoAlarmWatch" />
 
         <!-- In ascolto permanente del telefono via Bluetooth diretto (RFCOMM). -->
         <service

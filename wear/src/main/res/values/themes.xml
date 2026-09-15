@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sfondo nero prima che Compose disegni (stesso nero della palette Nothing
+         in Theme.kt): Theme.DeviceDefault.Black non esiste come risorsa, si
+         estende Theme.DeviceDefault forzando solo lo sfondo della finestra. -->
+    <style name="Theme.NoAlarmWatch" parent="android:Theme.DeviceDefault">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

@@ -13,7 +13,25 @@ import com.noalarm.data.Alarm
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.util.UUID
+import java.util.concurrent.Callable
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+
+/** Cosa e' successo nell'ultimo tentativo di raggiungere il watch, per la schermata di prova. */
+data class WearStatus(
+    val checking: Boolean = false,
+    val permission: Boolean? = null,
+    val bondedDevices: List<String> = emptyList(),
+    val connectedTo: String? = null,
+    val method: String? = null,
+    val elapsedMs: Long? = null,
+    val sent: Boolean? = null,
+    val ackReceived: Boolean? = null,
+    val ackMs: Long? = null,
+    val lastError: String? = null,
+)
 
 /**
  * Fa suonare/spegnere l'eco sul watch abbinato via Bluetooth diretto (RFCOMM
@@ -40,6 +58,9 @@ object WearBridge {
     private val executor = Executors.newCachedThreadPool()
     @Volatile private var socket: BluetoothSocket? = null
 
+    private val _status = MutableStateFlow(WearStatus())
+    val status: StateFlow<WearStatus> = _status
+
     fun ringOnWatches(context: Context, alarm: Alarm) {
         if (!hasPermission(context)) return
         executor.execute {
@@ -63,6 +84,55 @@ object WearBridge {
         }
     }
 
+    /**
+     * Prova manuale dalle Impostazioni: stessa strada di [ringOnWatches] (stesso
+     * [connect], stesso [ACTION_RING] con id 0 come la "Prova" locale sul watch),
+     * ma passo per passo in [status] invece di restare muta se qualcosa non va.
+     * Il watch (BridgeService v1.4.18+) rimanda subito lo stesso [ACTION_RING]
+     * come conferma di ricezione, senza bisogno di premere nulla sul quadrante.
+     */
+    fun test(context: Context) {
+        if (!hasPermission(context)) {
+            _status.value = WearStatus(permission = false, lastError = "Permesso Bluetooth non concesso")
+            return
+        }
+        _status.value = WearStatus(checking = true, permission = true)
+        executor.execute {
+            closeQuietly()
+            val start = System.currentTimeMillis()
+            val s = connect()
+            val connectMs = System.currentTimeMillis() - start
+            if (s == null) {
+                _status.value = _status.value.copy(checking = false, elapsedMs = connectMs)
+                return@execute
+            }
+            socket = s
+            val sent = runCatching {
+                DataOutputStream(s.outputStream).apply {
+                    writeByte(ACTION_RING); writeLong(0L); writeUTF("Prova NoAlarm"); flush()
+                }
+            }.isSuccess
+            if (!sent) {
+                _status.value = _status.value.copy(
+                    checking = false, elapsedMs = connectMs, sent = false,
+                    lastError = "Scrittura sulla connessione fallita",
+                )
+                return@execute
+            }
+            val ackStart = System.currentTimeMillis()
+            val acked = runCatching {
+                executor.submit(Callable { DataInputStream(s.inputStream).readByte().toInt() })
+                    .get(5, TimeUnit.SECONDS) == ACTION_RING
+            }.getOrDefault(false)
+            _status.value = _status.value.copy(
+                checking = false, elapsedMs = connectMs, sent = true,
+                ackReceived = acked, ackMs = if (acked) System.currentTimeMillis() - ackStart else null,
+                lastError = if (!acked) "Nessuna risposta dal watch in 5 s: l'app li' e' aggiornata e in esecuzione?" else null,
+            )
+            if (acked) listenForReply(context, s)
+        }
+    }
+
     /** Resta in ascolto sulla stessa connessione finche' non arriva un esito o si chiude. */
     private fun listenForReply(context: Context, s: BluetoothSocket) {
         val input = DataInputStream(s.inputStream)
@@ -79,23 +149,42 @@ object WearBridge {
     // ascolto sullo stesso UUID accetta, gli altri rifiutano subito la connessione.
     @SuppressLint("MissingPermission") // verificato da hasPermission()
     private fun connect(): BluetoothSocket? {
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return null
+        val adapter = BluetoothAdapter.getDefaultAdapter()
+        if (adapter == null) {
+            _status.value = _status.value.copy(lastError = "Bluetooth non disponibile su questo dispositivo")
+            return null
+        }
         // Richiede BLUETOOTH_SCAN su API 31+ (non chiesto: l'eco usa solo BLUETOOTH_CONNECT),
         // quindi lancia SecurityException - qui andrebbe persa dentro executor.execute()
         // e farebbe crashare l'app. Solo un'ottimizzazione facoltativa: si tenta comunque.
         runCatching { adapter.cancelDiscovery() }
-        for (device in adapter.bondedDevices.orEmpty()) {
+        val devices = adapter.bondedDevices.orEmpty()
+        _status.value = _status.value.copy(
+            bondedDevices = devices.map { it.name ?: it.address }, connectedTo = null, method = null,
+        )
+        for (device in devices) {
+            val name = device.name ?: device.address
             // Il canale diretto prima della SDP, non dopo: su stack di terze parti
             // (Ticwatch/Mobvoi) la ricerca SDP puo' restare bloccata per svariati
             // secondi prima di fallire, e aspettarla per intero come primo tentativo
             // fa arrivare l'eco quando la sveglia sul telefono e' ormai gia' spenta.
-            val s = runCatching {
-                fallbackSocket(device).also { it.connect() }
-            }.getOrNull() ?: runCatching {
+            val direct = runCatching { fallbackSocket(device).also { it.connect() } }.getOrNull()
+            if (direct != null) {
+                _status.value = _status.value.copy(connectedTo = name, method = "Canale diretto")
+                return direct
+            }
+            val sdp = runCatching {
                 device.createRfcommSocketToServiceRecord(SERVICE_UUID).also { it.connect() }
             }.getOrNull()
-            if (s != null) return s
+            if (sdp != null) {
+                _status.value = _status.value.copy(connectedTo = name, method = "SDP (ripiego)")
+                return sdp
+            }
         }
+        _status.value = _status.value.copy(
+            lastError = if (devices.isEmpty()) "Nessun dispositivo Bluetooth accoppiato"
+            else "Nessuno dei ${devices.size} dispositivi accoppiati risponde sull'UUID dell'eco",
+        )
         return null
     }
 

@@ -102,6 +102,9 @@ class BridgeService : Service() {
                     val id = runCatching { input.readLong() }.getOrNull() ?: break
                     val label = runCatching { input.readUTF() }.getOrNull() ?: ""
                     ring(id, label)
+                    // Conferma di ricezione, usata dalla prova di connessione sul telefono
+                    // (WearBridge.test()): per una sveglia vera il telefono la ignora.
+                    respond(ACTION_RING)
                 }
                 ACTION_STOP -> {
                     NotificationManagerCompat.from(this).cancel(ID_RING)

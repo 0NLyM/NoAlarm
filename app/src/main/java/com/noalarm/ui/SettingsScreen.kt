@@ -52,6 +52,7 @@ fun SettingsScreen() {
     val context = LocalContext.current
     val s by Store.settings.collectAsStateWithLifecycle()
     var glyphTest by remember { mutableStateOf(false) }
+    var wearTest by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -82,6 +83,11 @@ fun SettingsScreen() {
             Modifier.padding(horizontal = 4.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        RowItem(
+            title = "Prova la connessione con l'orologio",
+            subtitle = "Manda un'eco di prova e mostra dove si ferma se non arriva",
+            onClick = { wearTest = true },
         )
 
         SectionLabel("Comandi mentre suona")
@@ -170,6 +176,7 @@ fun SettingsScreen() {
     }
 
     if (glyphTest) GlyphTestSheet { glyphTest = false }
+    if (wearTest) WearTestSheet { wearTest = false }
 }
 
 /** Riga che cicla fra i valori possibili a ogni tocco: niente menu, niente dialog. */

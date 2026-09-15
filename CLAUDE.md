@@ -49,6 +49,9 @@ device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
 ```
 Provare prima la SDP (ordine pre-v1.4.17) faceva arrivare l'eco sul watch decine di secondi dopo che la sveglia sul telefono era già stata spenta.
 
+### Strumento di Prova (v1.4.18)
+Impostazioni → sezione "Sveglia" → "Prova la connessione con l'orologio" (`WearTestSheet.kt`), stesso schema della prova Glyph: `WearBridge.status` (`StateFlow<WearStatus>`) espone permesso, dispositivi accoppiati, a chi/con che metodo si è connesso, tempo di connessione, se il messaggio è stato scritto, se e in quanto è arrivato l'ack, ultimo errore. `WearBridge.test()` manda lo stesso `ACTION_RING` id 0 della "Prova" locale sul watch; `BridgeService.handle()` ora rimanda **sempre** lo stesso `ACTION_RING` come conferma di ricezione subito dopo aver fatto suonare l'eco (per una sveglia vera il telefono lo ignora, non c'è branch per `ACTION_RING` in `listenForReply()`). Serve a distinguere "non si connette", "si connette ma non scrive", "scrive ma il watch non risponde" (es. APK watch non aggiornato) invece di scoprirlo solo quando una sveglia vera non arriva.
+
 ### Vibrazione sul Watch
 **Bug risolto in v1.4.15**: `RingActivity` usava `createWaveform(..., repeat=0)` (loop infinito) senza mai chiamare `vibrator.cancel()` → continuava a vibrare anche dopo Spegni/Posticipa o stop dal telefono.
 **Fix**: memorizzare il `Vibrator` e chiamare `vibrator.cancel()` in `onDestroy()`.
@@ -67,8 +70,8 @@ Qualsiasi servizio avviato via `startForegroundService()` DEVE chiamare `startFo
 
 ## Versioni Attuali
 
-- **App**: v1.4.17 (versionCode 38)
-- **Watch**: v1.1.3 (versionCode 6)
+- **App**: v1.4.18 (versionCode 39)
+- **Watch**: v1.1.4 (versionCode 7)
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
 
@@ -123,7 +126,8 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 | `wear/src/main/java/com/noalarm/watch/BootReceiver.kt` | Restart BridgeService su boot |
 | `wear/src/main/AndroidManifest.xml` | Permessi, FGS type, meta-data standalone |
 | `app/src/main/java/com/noalarm/alarm/AlarmService.kt` | Ring logic phone, chiama `WearBridge.ringOnWatches()` |
+| `app/src/main/java/com/noalarm/ui/WearTestSheet.kt` | Schermata di prova connessione watch (Impostazioni) |
 
 ---
 
-**Ultima revisione**: v1.4.17/1.1.3 (15 Sep 2026) — eco watch non piu' in ritardo (canale diretto provato prima della SDP lenta).
+**Ultima revisione**: v1.4.18/1.1.4 (15 Sep 2026) — strumento di prova connessione watch in Impostazioni (WearTestSheet), watch ora conferma con ack ogni ACTION_RING ricevuto.

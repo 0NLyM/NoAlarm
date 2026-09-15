@@ -28,6 +28,7 @@ class RingActivity : ComponentActivity() {
 
     private var id: Long = 0L
     private var label = mutableStateOf("")
+    private var vibrator: Vibrator? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,13 +68,14 @@ class RingActivity : ComponentActivity() {
     }
 
     private fun vibrate() {
-        val vibrator = if (Build.VERSION.SDK_INT >= 31) {
+        val v = if (Build.VERSION.SDK_INT >= 31) {
             getSystemService(VibratorManager::class.java).defaultVibrator
         } else {
             @Suppress("DEPRECATION")
             getSystemService(Vibrator::class.java)
         }
-        vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400, 1000), 0))
+        vibrator = v
+        v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400, 1000), 0))
     }
 
     private fun respond(action: Int) {
@@ -83,6 +85,9 @@ class RingActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        // Il waveform vibra in loop (repeat=0): senza cancel() esplicito continua
+        // anche a schermata chiusa, sia per Spegni/Posticipa sia per lo stop dal telefono.
+        vibrator?.cancel()
         if (current == this) current = null
         super.onDestroy()
     }

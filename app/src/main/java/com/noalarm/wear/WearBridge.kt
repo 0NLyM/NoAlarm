@@ -3,6 +3,7 @@ package com.noalarm.wear
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.content.pm.PackageManager
@@ -79,14 +80,25 @@ object WearBridge {
     @SuppressLint("MissingPermission") // verificato da hasPermission()
     private fun connect(): BluetoothSocket? {
         val adapter = BluetoothAdapter.getDefaultAdapter() ?: return null
+        adapter.cancelDiscovery() // una scansione in corso puo' far fallire il connect()
         for (device in adapter.bondedDevices.orEmpty()) {
             val s = runCatching {
                 device.createRfcommSocketToServiceRecord(SERVICE_UUID).also { it.connect() }
+            }.getOrNull() ?: runCatching {
+                fallbackSocket(device).also { it.connect() }
             }.getOrNull()
             if (s != null) return s
         }
         return null
     }
+
+    // Su alcuni stack Bluetooth di terze parti (es. Ticwatch/Mobvoi) la ricerca SDP
+    // dell'UUID appena registrato da listenUsingRfcommWithServiceRecord() non si
+    // risolve subito lato client. Bypassa la SDP e connette direttamente al canale 1,
+    // il primo che l'OS assegna dinamicamente a quel metodo lato server.
+    private fun fallbackSocket(device: BluetoothDevice): BluetoothSocket =
+        device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+            .invoke(device, 1) as BluetoothSocket
 
     private fun closeQuietly() {
         runCatching { socket?.close() }

@@ -62,6 +62,9 @@ Impostazioni → sezione "Sveglia" → "Prova la connessione con l'orologio" (`W
 Il watch monta `targetSdk 35`. Da Android 14 (API 34) dichiarare `USE_FULL_SCREEN_INTENT` nel manifest **non basta piu'**: senza consenso esplicito dell'utente in Impostazioni, `NotificationCompat.Builder.setFullScreenIntent()` (usato da `BridgeService.ring()`) degrada in silenzio a notifica normale — l'eco arriva come notifica invece che come `RingActivity` a tutto schermo con vibrazione e i tasti Rinvia/Spegni. **Sintomo osservato (v1.4.18)**: ack ricevuto in 107 ms (connessione BT ok), ma solo una notifica sul watch, nessuna schermata.
 **Fix v1.4.19**: `MainActivity.kt` (watch) controlla `NotificationManager.canUseFullScreenIntent()` (`>= 34`, sempre `true` sotto) a ogni `onResume()`; se `false`, mostra un avviso con pulsante che apre `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT` per questo pacchetto.
 
+**Persisteva anche a schermo spento (v1.1.5)**: col permesso concesso, l'utente ha comunque visto la notifica invece della schermata piena con lo schermo del watch spento/in ambient — la condizione in cui il fullScreenIntent dovrebbe auto-aprirsi da solo. Su questo stack Wear OS evidentemente non lo fa.
+**Fix v1.1.6**: `BridgeService.ring()` tenta anche `startActivity()` diretto su `RingActivity` PRIMA di postare la notifica (avvolto in `runCatching`: se l'OS lo blocca, resta la notifica come ripiego, nessuna regressione). Non c'e' garanzia formale che un servizio in background possa farlo (da qui il tentativo protetto invece che l'unica strada), ma vale la pena provarlo dato che il meccanismo "ufficiale" (fullScreenIntent) non si comporta come sul telefono.
+
 ### Vibrazione sul Watch
 **Bug risolto in v1.4.15**: `RingActivity` usava `createWaveform(..., repeat=0)` (loop infinito) senza mai chiamare `vibrator.cancel()` → continuava a vibrare anche dopo Spegni/Posticipa o stop dal telefono.
 **Fix**: memorizzare il `Vibrator` e chiamare `vibrator.cancel()` in `onDestroy()`.
@@ -75,13 +78,16 @@ Il watch monta `targetSdk 35`. Da Android 14 (API 34) dichiarare `USE_FULL_SCREE
 ### Foreground Service Contract (Android 8+)
 Qualsiasi servizio avviato via `startForegroundService()` DEVE chiamare `startForeground()` entro pochi secondi o l'OS crasha l'app. **Watch crash v1.4.13-14**: permission check in `start()` non matching quello in `onStartCommand()` → su API ≤30 si bloccava senza `startForeground()`. **Fix v1.4.14**: unificare in `hasPermission(context)` riusato da entrambi.
 
+### Stile Nothing sul Watch (v1.1.6)
+Prima usava il Material3 di default (schema colori chiaro/scuro di sistema), nessuna parentela visiva col telefono. `wear/.../Theme.kt` duplica la stessa palette Nothing di `app/ui/theme/Theme.kt` (nero `Ink`, rosso `NothingRed`, bianco `Chalk` — nessun modulo condiviso, stessa scelta gia' fatta per l'UUID) in un `NoAlarmWatchTheme` sempre scuro (il watch non ha bisogno di seguire il tema chiaro di sistema). `Widgets.kt` aggiunge `PillButton`, l'equivalente senza dot-matrix di `DotPillButton` del telefono: pillola arrotondata, testo maiuscolo, rosso per l'azione enfatizzata ("Spegni"), colore neutro per le altre ("Posticipa", "Prova", "Concedi") — stessa convenzione di `AlarmActivity` sul telefono. Temi delle Activity in `AndroidManifest.xml` passati a `Theme.DeviceDefault.Black.NoActionBar` per evitare un lampo bianco prima che Compose disegni.
+
 ### Metadata Wear OS
 `android:name="com.google.android.wearable.standalone"` governa **solo** l'auto-install del Play Store (non la logica app). Con `value="false"`, alcuni launcher Wear OS (Ticwatch/Mobvoi) **nascondono** app sideload dal drawer (anche se installate) perché non risultano "paired" via quel meccanismo. **Fix v1.4.14**: `value="true"`.
 
 ## Versioni Attuali
 
 - **App**: v1.4.20 (versionCode 41)
-- **Watch**: v1.1.5 (versionCode 8)
+- **Watch**: v1.1.6 (versionCode 9)
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
 
@@ -106,8 +112,11 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
    - Prova reale (v1.4.18): per il TicWatch E3 dell'utente e' successo il contrario (canale diretto fallito, SDP riuscita) — l'ipotesi sull'ordine era sbagliata, vedi Causa 5.
 5. ✅ **Causa 5 (v1.4.19, causa reale)**: con molti dispositivi Bluetooth accoppiati (nel caso reale: 14 — mouse, TV, pompa insulina, auto, cuffie...), `connect()` li provava tutti in sequenza, ciascuno con canale diretto e SDP uno dopo l'altro, prima di arrivare al watch: 64 secondi misurati prima di raggiungere il TicWatch (7° nella lista).
    - **Fix**: dispositivi di classe `WEARABLE_WRIST_WATCH` provati per primi; per ciascun dispositivo canale diretto e SDP in parallelo (`ExecutorCompletionService`, timeout 4 s) invece che in sequenza.
-6. ✅ **Causa 6 (v1.4.19)**: ack ricevuto (connessione BT funzionante), ma sul watch appariva solo una notifica invece della schermata `RingActivity` — vedi "Notifiche a Schermo Intero sul Watch (Android 14+)" sopra.
+6. **Causa 6 (v1.4.19, fix parziale)**: ack ricevuto (connessione BT funzionante), ma sul watch appariva solo una notifica invece della schermata `RingActivity` — vedi "Notifiche a Schermo Intero sul Watch (Android 14+)" sopra.
    - **Fix**: `MainActivity.kt` (watch) chiede il consenso `USE_FULL_SCREEN_INTENT` in Impostazioni quando manca.
+   - Non bastava: persisteva anche a schermo spento/ambient col permesso concesso, condizione in cui il fullScreenIntent dovrebbe auto-aprirsi da solo. Vedi Causa 7.
+7. ✅ **Causa 7 (v1.1.6)**: su questo stack Wear OS il fullScreenIntent non auto-apre `RingActivity` nemmeno a schermo spento, a differenza del telefono.
+   - **Fix**: `BridgeService.ring()` tenta anche `startActivity()` diretto (protetto da `runCatching`), oltre alla notifica con fullScreenIntent che resta come ripiego.
 
 ### Lint Failure `wear:lintVitalRelease`
 ✅ **Risolto in v1.4.13**: `play-services-wearable` tirava transitive fragment old, aggiunto `libs.androidx.fragment.ktx`. Poi rimosso tutto `play-services-wearable` quando passato a RFCOMM.
@@ -143,7 +152,9 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 | `app/src/main/java/com/noalarm/alarm/AlarmService.kt` | Ring logic phone, chiama `WearBridge.ringOnWatches()` |
 | `app/src/main/java/com/noalarm/ui/WearTestSheet.kt` | Schermata di prova connessione watch (Impostazioni) |
 | `app/src/main/java/com/noalarm/ui/WearDevicePicker.kt` | Selettore manuale del watch per l'eco (Impostazioni) |
+| `wear/src/main/java/com/noalarm/watch/Theme.kt` | Palette Nothing (duplicata dal telefono) per il watch |
+| `wear/src/main/java/com/noalarm/watch/Widgets.kt` | `PillButton`, equivalente watch di `DotPillButton` |
 
 ---
 
-**Ultima revisione**: v1.4.20/1.1.5 (15 Sep 2026) — scelta manuale del watch da usare per l'eco in Impostazioni, salta l'euristica per classe quando impostata.
+**Ultima revisione**: v1.4.20/1.1.6 (15 Sep 2026) — stile Nothing sul watch (Theme.kt, Widgets.kt), BridgeService tenta anche l'avvio diretto di RingActivity oltre al fullScreenIntent (non auto-apriva nemmeno a schermo spento).

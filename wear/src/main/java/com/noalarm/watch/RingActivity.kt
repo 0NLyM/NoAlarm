@@ -11,10 +11,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,16 +40,29 @@ class RingActivity : ComponentActivity() {
         applyIntent(intent)
 
         setContent {
-            MaterialTheme {
-                val text by label
-                Column(
-                    Modifier.fillMaxSize().padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Text(text.ifBlank { "Sveglia" }, style = MaterialTheme.typography.titleMedium)
-                    Button(onClick = { respond(BridgeService.ACTION_SNOOZE); finish() }) { Text("Posticipa") }
-                    Button(onClick = { respond(BridgeService.ACTION_DISMISS); finish() }) { Text("Spegni") }
+            NoAlarmWatchTheme {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    val text by label
+                    Column(
+                        Modifier.fillMaxSize().padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            text.ifBlank { "Sveglia" }.uppercase(),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        PillButton("Posticipa", onClick = { respond(BridgeService.ACTION_SNOOZE); finish() })
+                        Spacer(Modifier.height(12.dp))
+                        PillButton(
+                            "Spegni",
+                            onClick = { respond(BridgeService.ACTION_DISMISS); finish() },
+                            color = MaterialTheme.colorScheme.secondary,
+                            contentColor = MaterialTheme.colorScheme.onSecondary,
+                        )
+                    }
                 }
             }
         }

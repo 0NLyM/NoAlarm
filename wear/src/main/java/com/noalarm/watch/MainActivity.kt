@@ -13,14 +13,17 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 
@@ -52,24 +55,41 @@ class MainActivity : ComponentActivity() {
             requestBluetooth.launch(Manifest.permission.BLUETOOTH_CONNECT)
         }
         setContent {
-            MaterialTheme {
-                Column(
-                    Modifier.fillMaxSize().padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Text("NoAlarm")
-                    Text("In ascolto del telefono", style = MaterialTheme.typography.bodySmall)
-                    if (!fullScreenIntentGranted.value) {
+            NoAlarmWatchTheme {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    Column(
+                        Modifier.fillMaxSize().padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
                         Text(
-                            "Manca il permesso per le notifiche a schermo intero: la sveglia " +
-                                "arriverebbe solo come notifica, non a tutto schermo.",
-                            style = MaterialTheme.typography.bodySmall,
+                            "NOALARM",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.secondary,
                         )
-                        Button(onClick = ::requestFullScreenIntent) { Text("Concedi") }
-                    }
-                    Button(onClick = { startActivity(RingActivity.testIntent(this@MainActivity)) }) {
-                        Text("Prova")
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "In ascolto del telefono",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (!fullScreenIntentGranted.value) {
+                            Spacer(Modifier.height(16.dp))
+                            Text(
+                                "Manca il permesso per le notifiche a schermo intero: la sveglia " +
+                                    "arriverebbe solo come notifica, non a tutto schermo.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            PillButton("Concedi", onClick = ::requestFullScreenIntent)
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        PillButton(
+                            "Prova",
+                            onClick = { startActivity(RingActivity.testIntent(this@MainActivity)) },
+                        )
                     }
                 }
             }

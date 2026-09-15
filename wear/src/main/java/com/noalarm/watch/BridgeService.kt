@@ -117,14 +117,20 @@ class BridgeService : Service() {
     }
 
     /**
-     * Un servizio in background non puo' piu' avviare direttamente un'Activity
-     * a schermo intero (Android la blocca): serve una notifica a priorita'
-     * massima con setFullScreenIntent, lo stesso meccanismo gia' usato sul
-     * telefono per la schermata che suona davvero.
+     * Il fullScreenIntent della notifica sotto (stesso meccanismo del telefono)
+     * dovrebbe aprire RingActivity da solo quando lo schermo e' spento/in
+     * ambient - ma su questo stack Wear OS non succede nemmeno a schermo
+     * spento, restando solo una notifica da toccare. Si tenta quindi anche
+     * l'avvio diretto: se il sistema lo blocca (nessuna eccezione BAL
+     * garantita per un servizio in background) non succede nulla, e resta
+     * comunque la notifica sotto come ripiego.
      */
     private fun ring(id: Long, label: String) {
+        val intent = RingActivity.ringIntent(this, id, label)
+        runCatching { startActivity(intent) }
+
         val full = PendingIntent.getActivity(
-            this, 0, RingActivity.ringIntent(this, id, label),
+            this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val n = NotificationCompat.Builder(this, CH_RING)

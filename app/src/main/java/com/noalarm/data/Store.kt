@@ -186,6 +186,7 @@ object Store {
         put("defaultSnoozeMinutes", s.defaultSnoozeMinutes)
         put("defaultAutoSilenceMinutes", s.defaultAutoSilenceMinutes)
         put("defaultRingOnWatch", s.defaultRingOnWatch)
+        put("watchDeviceAddress", s.watchDeviceAddress); put("watchDeviceName", s.watchDeviceName)
         put("volumeKeyAction", s.volumeKeyAction.name); put("powerKeyAction", s.powerKeyAction.name)
         put("flipAction", s.flipAction.name); put("shakeAction", s.shakeAction.name)
         put("glyphEnabled", s.glyphEnabled); put("glyphAppChannel", s.glyphAppChannel)
@@ -212,6 +213,8 @@ object Store {
         defaultSnoozeMinutes = o.optInt("defaultSnoozeMinutes", 10),
         defaultAutoSilenceMinutes = o.optInt("defaultAutoSilenceMinutes", 10),
         defaultRingOnWatch = o.optBoolean("defaultRingOnWatch", true),
+        watchDeviceAddress = o.optString("watchDeviceAddress", ""),
+        watchDeviceName = o.optString("watchDeviceName", ""),
         volumeKeyAction = key(o, "volumeKeyAction", KeyAction.SNOOZE),
         powerKeyAction = key(o, "powerKeyAction", KeyAction.DISMISS),
         flipAction = key(o, "flipAction", KeyAction.NONE),

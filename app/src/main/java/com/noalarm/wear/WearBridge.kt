@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import com.noalarm.alarm.AlarmService
 import com.noalarm.data.Alarm
+import com.noalarm.data.Store
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.util.UUID
@@ -20,6 +21,9 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+
+/** Un dispositivo Bluetooth gia' accoppiato, per la scelta manuale dell'orologio in Impostazioni. */
+data class BondedDevice(val name: String, val address: String)
 
 /** Cosa e' successo nell'ultimo tentativo di raggiungere il watch, per la schermata di prova. */
 data class WearStatus(
@@ -79,6 +83,14 @@ object WearBridge {
                 listenForReply(context, s)
             }
         }
+    }
+
+    /** Dispositivi gia' accoppiati, per il selettore in Impostazioni. Nessuna connessione: solo l'elenco gia' in cache dal sistema. */
+    @SuppressLint("MissingPermission") // verificato da hasPermission()
+    fun bondedDevices(context: Context): List<BondedDevice> {
+        if (!hasPermission(context)) return emptyList()
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return emptyList()
+        return adapter.bondedDevices.orEmpty().map { BondedDevice(it.name ?: it.address, it.address) }
     }
 
     fun stopOnWatches(context: Context) {
@@ -151,9 +163,9 @@ object WearBridge {
     }
 
     // Con piu' dispositivi Bluetooth accoppiati (auricolari, auto, ecc.) provarli
-    // tutti in sequenza fa arrivare l'eco anche a sveglia gia' spenta: i dispositivi
-    // di classe "orologio" vanno tentati per primi, gli altri restano come ripiego
-    // solo se nessun orologio risponde.
+    // tutti in sequenza fa arrivare l'eco anche a sveglia gia' spenta: il watch
+    // scelto a mano in Impostazioni (se c'e') va tentato per primo, altrimenti
+    // i dispositivi di classe "orologio"; gli altri restano come ripiego.
     @SuppressLint("MissingPermission") // verificato da hasPermission()
     private fun connect(): BluetoothSocket? {
         val adapter = BluetoothAdapter.getDefaultAdapter()
@@ -165,8 +177,11 @@ object WearBridge {
         // quindi lancia SecurityException - qui andrebbe persa dentro executor.execute()
         // e farebbe crashare l'app. Solo un'ottimizzazione facoltativa: si tenta comunque.
         runCatching { adapter.cancelDiscovery() }
-        val devices = adapter.bondedDevices.orEmpty()
-            .sortedByDescending { it.bluetoothClass?.deviceClass == BluetoothClass.Device.WEARABLE_WRIST_WATCH }
+        val preferred = Store.settings.value.watchDeviceAddress
+        val devices = adapter.bondedDevices.orEmpty().sortedWith(
+            compareByDescending<BluetoothDevice> { it.address == preferred }
+                .thenByDescending { it.bluetoothClass?.deviceClass == BluetoothClass.Device.WEARABLE_WRIST_WATCH },
+        )
         _status.value = _status.value.copy(
             bondedDevices = devices.map { it.name ?: it.address }, connectedTo = null, method = null,
         )

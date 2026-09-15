@@ -52,6 +52,9 @@ device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
 
 **Fix v1.4.19**: `connect()` ordina i dispositivi accoppiati mettendo per primi quelli di classe `BluetoothClass.Device.WEARABLE_WRIST_WATCH`, e per ciascun dispositivo prova canale diretto e SDP **in parallelo** (`ExecutorCompletionService`, timeout 4 s a testa) invece che in sequenza — elimina sia la scommessa sull'ordine sia il costo dei dispositivi non-watch accoppiati.
 
+### Scelta Manuale del Watch (v1.4.20)
+La priorita' per classe rimane un'euristica: puo' sbagliare, e resta comunque un tentativo (anche se parallelo) su un dispositivo alla volta. `Settings.watchDeviceAddress`/`watchDeviceName` (Impostazioni → "Orologio da usare per l'eco", `WearDevicePicker.kt`) lascia scegliere a mano il dispositivo accoppiato: se impostato, `WearBridge.connect()` lo mette sempre per primo nell'ordinamento (`compareByDescending { it.address == preferred }.thenByDescending { classe watch }`), quindi un solo tentativo diretto invece di scorrere gli altri. Vuoto = rilevamento automatico (comportamento v1.4.19). `WearBridge.bondedDevices(context)` per popolare il selettore non si connette a nulla: legge solo `BluetoothAdapter.bondedDevices`, gia' in cache di sistema.
+
 ### Strumento di Prova (v1.4.18)
 Impostazioni → sezione "Sveglia" → "Prova la connessione con l'orologio" (`WearTestSheet.kt`), stesso schema della prova Glyph: `WearBridge.status` (`StateFlow<WearStatus>`) espone permesso, dispositivi accoppiati, a chi/con che metodo si è connesso, tempo di connessione, se il messaggio è stato scritto, se e in quanto è arrivato l'ack, ultimo errore. `WearBridge.test()` manda lo stesso `ACTION_RING` id 0 della "Prova" locale sul watch; `BridgeService.handle()` ora rimanda **sempre** lo stesso `ACTION_RING` come conferma di ricezione subito dopo aver fatto suonare l'eco (per una sveglia vera il telefono lo ignora, non c'è branch per `ACTION_RING` in `listenForReply()`). Serve a distinguere "non si connette", "si connette ma non scrive", "scrive ma il watch non risponde" (es. APK watch non aggiornato) invece di scoprirlo solo quando una sveglia vera non arriva.
 
@@ -77,7 +80,7 @@ Qualsiasi servizio avviato via `startForegroundService()` DEVE chiamare `startFo
 
 ## Versioni Attuali
 
-- **App**: v1.4.19 (versionCode 40)
+- **App**: v1.4.20 (versionCode 41)
 - **Watch**: v1.1.5 (versionCode 8)
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
@@ -114,6 +117,7 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 - `Alarm.ringOnWatch: Boolean` (default true) → sveglia suona anche sul watch
 - `Settings.defaultRingOnWatch` → preferenza per nuove sveglie
 - UI: switch in `AlarmScreen` riga 647, chip selector per gruppi esistenti
+- `Settings.watchDeviceAddress`/`watchDeviceName` → dispositivo scelto a mano per l'eco (vuoto = automatico), UI in `SettingsScreen`/`WearDevicePicker.kt`
 
 ## CI/Release Pipeline
 
@@ -138,7 +142,8 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 | `wear/src/main/AndroidManifest.xml` | Permessi, FGS type, meta-data standalone |
 | `app/src/main/java/com/noalarm/alarm/AlarmService.kt` | Ring logic phone, chiama `WearBridge.ringOnWatches()` |
 | `app/src/main/java/com/noalarm/ui/WearTestSheet.kt` | Schermata di prova connessione watch (Impostazioni) |
+| `app/src/main/java/com/noalarm/ui/WearDevicePicker.kt` | Selettore manuale del watch per l'eco (Impostazioni) |
 
 ---
 
-**Ultima revisione**: v1.4.19/1.1.5 (15 Sep 2026) — connessione BT a dispositivi multipli in parallelo (non piu' in sequenza, ordine SDP/diretto irrilevante), consenso notifiche a schermo intero richiesto sul watch (Android 14+).
+**Ultima revisione**: v1.4.20/1.1.5 (15 Sep 2026) — scelta manuale del watch da usare per l'eco in Impostazioni, salta l'euristica per classe quando impostata.

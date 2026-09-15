@@ -66,7 +66,7 @@ Qualsiasi servizio avviato via `startForegroundService()` DEVE chiamare `startFo
 
 ## Versioni Attuali
 
-- **App**: v1.4.15 (versionCode 36)
+- **App**: v1.4.16 (versionCode 37)
 - **Watch**: v1.1.3 (versionCode 6)
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
@@ -84,8 +84,10 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 ### Sveglia Non Arriva sul Watch
 1. ✅ **Causa 1**: SDP fallisce silenziosamente su stack terze parti.
    - **Fix**: fallback al canale RFCOMM 1.
-2. **Causa 2**: Discovery in corso blocca connessioni.
+2. ✅ **Causa 2**: Discovery in corso blocca connessioni.
    - **Fix**: `adapter.cancelDiscovery()` prima di tentare connect.
+3. ✅ **Causa 3 (v1.4.16)**: `cancelDiscovery()` richiede `BLUETOOTH_SCAN` su API 31+ (mai dichiarato: l'eco usa solo `BLUETOOTH_CONNECT`) → `SecurityException` non catturata dentro `executor.execute()` crashava l'intero processo telefono (app + `AlarmService` gia' in riproduzione) ogni volta che "Suona anche sull'orologio" era attivo, e la connessione RFCOMM non superava mai quel punto.
+   - **Fix**: `runCatching { adapter.cancelDiscovery() }` in `WearBridge.connect()` — e' solo un'ottimizzazione facoltativa, non deve essere fatale.
 
 ### Lint Failure `wear:lintVitalRelease`
 ✅ **Risolto in v1.4.13**: `play-services-wearable` tirava transitive fragment old, aggiunto `libs.androidx.fragment.ktx`. Poi rimosso tutto `play-services-wearable` quando passato a RFCOMM.
@@ -94,7 +96,7 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 
 - `Alarm.ringOnWatch: Boolean` (default true) → sveglia suona anche sul watch
 - `Settings.defaultRingOnWatch` → preferenza per nuove sveglie
-- UI: switch in `AlarmScreen` riga 631, chip selector per gruppi esistenti
+- UI: switch in `AlarmScreen` riga 647, chip selector per gruppi esistenti
 
 ## CI/Release Pipeline
 
@@ -121,4 +123,4 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 
 ---
 
-**Ultima revisione**: v1.4.15/1.1.3 (15 Sep 2026) — fallback RFCOMM, vibrazione fixed.
+**Ultima revisione**: v1.4.16/1.1.3 (15 Sep 2026) — crash echo watch (cancelDiscovery senza BLUETOOTH_SCAN) fixed, autosalvataggio non riattiva piu' le sveglie disabilitate, suoneria "Nessuna" supportata, orario di default +1 min, foglio creazione sveglia si apre a meta', UndoBar non piu' coperta dalla barra inferiore.

@@ -42,11 +42,12 @@ Nessun boilerplate, no astrazioni gratuite, no commenti che spiegano l'ovvio. Sc
 - **UUID costante** (duplicato in entrambi i file — nessun shared module): `a4f7f228-8f1a-4b8e-9c7b-6b6c6f6e6f77`
 
 ### Fallback di Connessione Bluetooth
-Su stack Bluetooth di terze parti (Ticwatch/Mobvoi), la ricerca SDP dell'UUID appena registrato può fallire silenziosamente. **Fallback in `WearBridge.connect()`**: se `createRfcommSocketToServiceRecord()` fallisce, bypassa SDP e connette direttamente al canale RFCOMM 1 via reflection:
+Su stack Bluetooth di terze parti (Ticwatch/Mobvoi), la ricerca SDP dell'UUID appena registrato può restare bloccata per svariati secondi prima di fallire (non fallisce all'istante). **`WearBridge.connect()` (v1.4.17) prova quindi PRIMA il canale RFCOMM 1 via reflection** (quello che il server assegna sempre a `listenUsingRfcommWithServiceRecord()`), **e solo come ripiego** `createRfcommSocketToServiceRecord()` con la SDP:
 ```kotlin
 device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
     .invoke(device, 1) as BluetoothSocket
 ```
+Provare prima la SDP (ordine pre-v1.4.17) faceva arrivare l'eco sul watch decine di secondi dopo che la sveglia sul telefono era già stata spenta.
 
 ### Vibrazione sul Watch
 **Bug risolto in v1.4.15**: `RingActivity` usava `createWaveform(..., repeat=0)` (loop infinito) senza mai chiamare `vibrator.cancel()` → continuava a vibrare anche dopo Spegni/Posticipa o stop dal telefono.
@@ -66,7 +67,7 @@ Qualsiasi servizio avviato via `startForegroundService()` DEVE chiamare `startFo
 
 ## Versioni Attuali
 
-- **App**: v1.4.16 (versionCode 37)
+- **App**: v1.4.17 (versionCode 38)
 - **Watch**: v1.1.3 (versionCode 6)
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
@@ -88,6 +89,8 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
    - **Fix**: `adapter.cancelDiscovery()` prima di tentare connect.
 3. ✅ **Causa 3 (v1.4.16)**: `cancelDiscovery()` richiede `BLUETOOTH_SCAN` su API 31+ (mai dichiarato: l'eco usa solo `BLUETOOTH_CONNECT`) → `SecurityException` non catturata dentro `executor.execute()` crashava l'intero processo telefono (app + `AlarmService` gia' in riproduzione) ogni volta che "Suona anche sull'orologio" era attivo, e la connessione RFCOMM non superava mai quel punto.
    - **Fix**: `runCatching { adapter.cancelDiscovery() }` in `WearBridge.connect()` — e' solo un'ottimizzazione facoltativa, non deve essere fatale.
+4. ✅ **Causa 4 (v1.4.17)**: una volta risolto il crash, l'eco arrivava comunque tardi (a sveglia telefono ormai spenta) perche' `connect()` provava PRIMA `createRfcommSocketToServiceRecord()` (SDP lenta/bloccante su Ticwatch/Mobvoi) e solo dopo il canale diretto.
+   - **Fix**: invertito l'ordine in `WearBridge.connect()` — canale 1 via reflection per primo, SDP come ripiego.
 
 ### Lint Failure `wear:lintVitalRelease`
 ✅ **Risolto in v1.4.13**: `play-services-wearable` tirava transitive fragment old, aggiunto `libs.androidx.fragment.ktx`. Poi rimosso tutto `play-services-wearable` quando passato a RFCOMM.
@@ -123,4 +126,4 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 
 ---
 
-**Ultima revisione**: v1.4.16/1.1.3 (15 Sep 2026) — crash echo watch (cancelDiscovery senza BLUETOOTH_SCAN) fixed, autosalvataggio non riattiva piu' le sveglie disabilitate, suoneria "Nessuna" supportata, orario di default +1 min, foglio creazione sveglia si apre a meta', UndoBar non piu' coperta dalla barra inferiore.
+**Ultima revisione**: v1.4.17/1.1.3 (15 Sep 2026) — eco watch non piu' in ritardo (canale diretto provato prima della SDP lenta).

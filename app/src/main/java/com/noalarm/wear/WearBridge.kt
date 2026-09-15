@@ -85,10 +85,14 @@ object WearBridge {
         // e farebbe crashare l'app. Solo un'ottimizzazione facoltativa: si tenta comunque.
         runCatching { adapter.cancelDiscovery() }
         for (device in adapter.bondedDevices.orEmpty()) {
+            // Il canale diretto prima della SDP, non dopo: su stack di terze parti
+            // (Ticwatch/Mobvoi) la ricerca SDP puo' restare bloccata per svariati
+            // secondi prima di fallire, e aspettarla per intero come primo tentativo
+            // fa arrivare l'eco quando la sveglia sul telefono e' ormai gia' spenta.
             val s = runCatching {
-                device.createRfcommSocketToServiceRecord(SERVICE_UUID).also { it.connect() }
-            }.getOrNull() ?: runCatching {
                 fallbackSocket(device).also { it.connect() }
+            }.getOrNull() ?: runCatching {
+                device.createRfcommSocketToServiceRecord(SERVICE_UUID).also { it.connect() }
             }.getOrNull()
             if (s != null) return s
         }

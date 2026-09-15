@@ -86,7 +86,7 @@ Prima usava il Material3 di default (schema colori chiaro/scuro di sistema), nes
 
 ## Versioni Attuali
 
-- **App**: v1.4.20 (versionCode 41)
+- **App**: v1.4.21 (versionCode 42)
 - **Watch**: v1.1.6 (versionCode 9)
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
@@ -157,4 +157,4 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 
 ---
 
-**Ultima revisione**: v1.4.20/1.1.6 (15 Sep 2026) — stile Nothing sul watch (Theme.kt, Widgets.kt), BridgeService tenta anche l'avvio diretto di RingActivity oltre al fullScreenIntent (non auto-apriva nemmeno a schermo spento).
+**Ultima revisione**: v1.4.21/1.1.6 (15 Sep 2026) — stile Nothing sul watch (Theme.kt, Widgets.kt), BridgeService tenta anche l'avvio diretto di RingActivity oltre al fullScreenIntent (non auto-apriva nemmeno a schermo spento). App non toccata in questo giro, versione avanzata solo per continuita' del tag di release.

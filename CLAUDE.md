@@ -42,15 +42,22 @@ Nessun boilerplate, no astrazioni gratuite, no commenti che spiegano l'ovvio. Sc
 - **UUID costante** (duplicato in entrambi i file — nessun shared module): `a4f7f228-8f1a-4b8e-9c7b-6b6c6f6e6f77`
 
 ### Fallback di Connessione Bluetooth
-Su stack Bluetooth di terze parti (Ticwatch/Mobvoi), la ricerca SDP dell'UUID appena registrato può restare bloccata per svariati secondi prima di fallire (non fallisce all'istante). **`WearBridge.connect()` (v1.4.17) prova quindi PRIMA il canale RFCOMM 1 via reflection** (quello che il server assegna sempre a `listenUsingRfcommWithServiceRecord()`), **e solo come ripiego** `createRfcommSocketToServiceRecord()` con la SDP:
+Su stack Bluetooth di terze parti (Ticwatch/Mobvoi), la ricerca SDP dell'UUID appena registrato può restare bloccata per svariati secondi prima di fallire (non fallisce all'istante). `WearBridge.connect()` prova quindi canale RFCOMM 1 via reflection e SDP **in parallelo** (v1.4.19, vedi sotto), non piu' uno dopo l'altro:
 ```kotlin
 device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
     .invoke(device, 1) as BluetoothSocket
 ```
-Provare prima la SDP (ordine pre-v1.4.17) faceva arrivare l'eco sul watch decine di secondi dopo che la sveglia sul telefono era già stata spenta.
+
+**v1.4.17** aveva provato a invertire l'ordine (canale diretto prima della SDP) partendo dal presupposto che la SDP fosse sempre lenta/inaffidabile su questo hardware. **Prova reale su dispositivo (v1.4.18, utente con 14 dispositivi Bluetooth accoppiati)**: per il TicWatch E3 il canale diretto ha *fallito* e solo la SDP ha funzionato — l'assunzione era sbagliata, non e' detto quale delle due risponda per prima su un dato watch. La causa vera del ritardo enorme (64 secondi misurati) non era l'ordine SDP/diretto ma **il numero di dispositivi accoppiati**: `connect()` provava tutti e 14 in sequenza (mouse, TV, pompa insulina, auto, cuffie...) prima di arrivare al watch, con due tentativi bloccanti ciascuno.
+
+**Fix v1.4.19**: `connect()` ordina i dispositivi accoppiati mettendo per primi quelli di classe `BluetoothClass.Device.WEARABLE_WRIST_WATCH`, e per ciascun dispositivo prova canale diretto e SDP **in parallelo** (`ExecutorCompletionService`, timeout 4 s a testa) invece che in sequenza — elimina sia la scommessa sull'ordine sia il costo dei dispositivi non-watch accoppiati.
 
 ### Strumento di Prova (v1.4.18)
 Impostazioni → sezione "Sveglia" → "Prova la connessione con l'orologio" (`WearTestSheet.kt`), stesso schema della prova Glyph: `WearBridge.status` (`StateFlow<WearStatus>`) espone permesso, dispositivi accoppiati, a chi/con che metodo si è connesso, tempo di connessione, se il messaggio è stato scritto, se e in quanto è arrivato l'ack, ultimo errore. `WearBridge.test()` manda lo stesso `ACTION_RING` id 0 della "Prova" locale sul watch; `BridgeService.handle()` ora rimanda **sempre** lo stesso `ACTION_RING` come conferma di ricezione subito dopo aver fatto suonare l'eco (per una sveglia vera il telefono lo ignora, non c'è branch per `ACTION_RING` in `listenForReply()`). Serve a distinguere "non si connette", "si connette ma non scrive", "scrive ma il watch non risponde" (es. APK watch non aggiornato) invece di scoprirlo solo quando una sveglia vera non arriva.
+
+### Notifiche a Schermo Intero sul Watch (Android 14+)
+Il watch monta `targetSdk 35`. Da Android 14 (API 34) dichiarare `USE_FULL_SCREEN_INTENT` nel manifest **non basta piu'**: senza consenso esplicito dell'utente in Impostazioni, `NotificationCompat.Builder.setFullScreenIntent()` (usato da `BridgeService.ring()`) degrada in silenzio a notifica normale — l'eco arriva come notifica invece che come `RingActivity` a tutto schermo con vibrazione e i tasti Rinvia/Spegni. **Sintomo osservato (v1.4.18)**: ack ricevuto in 107 ms (connessione BT ok), ma solo una notifica sul watch, nessuna schermata.
+**Fix v1.4.19**: `MainActivity.kt` (watch) controlla `NotificationManager.canUseFullScreenIntent()` (`>= 34`, sempre `true` sotto) a ogni `onResume()`; se `false`, mostra un avviso con pulsante che apre `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT` per questo pacchetto.
 
 ### Vibrazione sul Watch
 **Bug risolto in v1.4.15**: `RingActivity` usava `createWaveform(..., repeat=0)` (loop infinito) senza mai chiamare `vibrator.cancel()` → continuava a vibrare anche dopo Spegni/Posticipa o stop dal telefono.
@@ -70,8 +77,8 @@ Qualsiasi servizio avviato via `startForegroundService()` DEVE chiamare `startFo
 
 ## Versioni Attuali
 
-- **App**: v1.4.18 (versionCode 39)
-- **Watch**: v1.1.4 (versionCode 7)
+- **App**: v1.4.19 (versionCode 40)
+- **Watch**: v1.1.5 (versionCode 8)
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
 
@@ -92,8 +99,12 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
    - **Fix**: `adapter.cancelDiscovery()` prima di tentare connect.
 3. ✅ **Causa 3 (v1.4.16)**: `cancelDiscovery()` richiede `BLUETOOTH_SCAN` su API 31+ (mai dichiarato: l'eco usa solo `BLUETOOTH_CONNECT`) → `SecurityException` non catturata dentro `executor.execute()` crashava l'intero processo telefono (app + `AlarmService` gia' in riproduzione) ogni volta che "Suona anche sull'orologio" era attivo, e la connessione RFCOMM non superava mai quel punto.
    - **Fix**: `runCatching { adapter.cancelDiscovery() }` in `WearBridge.connect()` — e' solo un'ottimizzazione facoltativa, non deve essere fatale.
-4. ✅ **Causa 4 (v1.4.17)**: una volta risolto il crash, l'eco arrivava comunque tardi (a sveglia telefono ormai spenta) perche' `connect()` provava PRIMA `createRfcommSocketToServiceRecord()` (SDP lenta/bloccante su Ticwatch/Mobvoi) e solo dopo il canale diretto.
-   - **Fix**: invertito l'ordine in `WearBridge.connect()` — canale 1 via reflection per primo, SDP come ripiego.
+4. **Causa 4 (v1.4.17, ipotesi poi corretta in v1.4.19)**: si era ipotizzato che l'eco arrivasse tardi perche' `connect()` provava PRIMA `createRfcommSocketToServiceRecord()` (SDP lenta/bloccante su Ticwatch/Mobvoi) e solo dopo il canale diretto, e si era invertito l'ordine.
+   - Prova reale (v1.4.18): per il TicWatch E3 dell'utente e' successo il contrario (canale diretto fallito, SDP riuscita) — l'ipotesi sull'ordine era sbagliata, vedi Causa 5.
+5. ✅ **Causa 5 (v1.4.19, causa reale)**: con molti dispositivi Bluetooth accoppiati (nel caso reale: 14 — mouse, TV, pompa insulina, auto, cuffie...), `connect()` li provava tutti in sequenza, ciascuno con canale diretto e SDP uno dopo l'altro, prima di arrivare al watch: 64 secondi misurati prima di raggiungere il TicWatch (7° nella lista).
+   - **Fix**: dispositivi di classe `WEARABLE_WRIST_WATCH` provati per primi; per ciascun dispositivo canale diretto e SDP in parallelo (`ExecutorCompletionService`, timeout 4 s) invece che in sequenza.
+6. ✅ **Causa 6 (v1.4.19)**: ack ricevuto (connessione BT funzionante), ma sul watch appariva solo una notifica invece della schermata `RingActivity` — vedi "Notifiche a Schermo Intero sul Watch (Android 14+)" sopra.
+   - **Fix**: `MainActivity.kt` (watch) chiede il consenso `USE_FULL_SCREEN_INTENT` in Impostazioni quando manca.
 
 ### Lint Failure `wear:lintVitalRelease`
 ✅ **Risolto in v1.4.13**: `play-services-wearable` tirava transitive fragment old, aggiunto `libs.androidx.fragment.ktx`. Poi rimosso tutto `play-services-wearable` quando passato a RFCOMM.
@@ -130,4 +141,4 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 
 ---
 
-**Ultima revisione**: v1.4.18/1.1.4 (15 Sep 2026) — strumento di prova connessione watch in Impostazioni (WearTestSheet), watch ora conferma con ack ogni ACTION_RING ricevuto.
+**Ultima revisione**: v1.4.19/1.1.5 (15 Sep 2026) — connessione BT a dispositivi multipli in parallelo (non piu' in sequenza, ordine SDP/diretto irrilevante), consenso notifiche a schermo intero richiesto sul watch (Android 14+).

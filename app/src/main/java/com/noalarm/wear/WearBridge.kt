@@ -3,6 +3,7 @@ package com.noalarm.wear
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.content.Context
@@ -14,6 +15,7 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.util.UUID
 import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorCompletionService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,6 +56,9 @@ object WearBridge {
     private const val ACTION_STOP = 2
     private const val ACTION_SNOOZE = 3
     private const val ACTION_DISMISS = 4
+    // Limite per dispositivo (canale diretto + SDP in parallelo): con parecchi
+    // dispositivi accoppiati non raggiungibili, evita di sommare minuti d'attesa.
+    private const val CONNECT_TIMEOUT_MS = 4000L
 
     private val executor = Executors.newCachedThreadPool()
     @Volatile private var socket: BluetoothSocket? = null
@@ -145,8 +150,10 @@ object WearBridge {
         }
     }
 
-    // Tenta ogni dispositivo gia' accoppiato: solo quello con BridgeService in
-    // ascolto sullo stesso UUID accetta, gli altri rifiutano subito la connessione.
+    // Con piu' dispositivi Bluetooth accoppiati (auricolari, auto, ecc.) provarli
+    // tutti in sequenza fa arrivare l'eco anche a sveglia gia' spenta: i dispositivi
+    // di classe "orologio" vanno tentati per primi, gli altri restano come ripiego
+    // solo se nessun orologio risponde.
     @SuppressLint("MissingPermission") // verificato da hasPermission()
     private fun connect(): BluetoothSocket? {
         val adapter = BluetoothAdapter.getDefaultAdapter()
@@ -159,32 +166,48 @@ object WearBridge {
         // e farebbe crashare l'app. Solo un'ottimizzazione facoltativa: si tenta comunque.
         runCatching { adapter.cancelDiscovery() }
         val devices = adapter.bondedDevices.orEmpty()
+            .sortedByDescending { it.bluetoothClass?.deviceClass == BluetoothClass.Device.WEARABLE_WRIST_WATCH }
         _status.value = _status.value.copy(
             bondedDevices = devices.map { it.name ?: it.address }, connectedTo = null, method = null,
         )
         for (device in devices) {
-            val name = device.name ?: device.address
-            // Il canale diretto prima della SDP, non dopo: su stack di terze parti
-            // (Ticwatch/Mobvoi) la ricerca SDP puo' restare bloccata per svariati
-            // secondi prima di fallire, e aspettarla per intero come primo tentativo
-            // fa arrivare l'eco quando la sveglia sul telefono e' ormai gia' spenta.
-            val direct = runCatching { fallbackSocket(device).also { it.connect() } }.getOrNull()
-            if (direct != null) {
-                _status.value = _status.value.copy(connectedTo = name, method = "Canale diretto")
-                return direct
-            }
-            val sdp = runCatching {
-                device.createRfcommSocketToServiceRecord(SERVICE_UUID).also { it.connect() }
-            }.getOrNull()
-            if (sdp != null) {
-                _status.value = _status.value.copy(connectedTo = name, method = "SDP (ripiego)")
-                return sdp
-            }
+            val (s, method) = connectToDevice(device) ?: continue
+            _status.value = _status.value.copy(connectedTo = device.name ?: device.address, method = method)
+            return s
         }
         _status.value = _status.value.copy(
             lastError = if (devices.isEmpty()) "Nessun dispositivo Bluetooth accoppiato"
             else "Nessuno dei ${devices.size} dispositivi accoppiati risponde sull'UUID dell'eco",
         )
+        return null
+    }
+
+    /**
+     * Canale diretto e SDP in parallelo invece che in sequenza: su stack di terze
+     * parti (Ticwatch/Mobvoi) non e' detto quale delle due risponda per prima, e
+     * aspettare la prima per intero prima di provare la seconda raddoppia
+     * l'attesa su ogni dispositivo, watch compreso.
+     */
+    private fun connectToDevice(device: BluetoothDevice): Pair<BluetoothSocket, String>? {
+        val completion = ExecutorCompletionService<Pair<BluetoothSocket, String>?>(executor)
+        val tasks = listOf(
+            completion.submit(Callable {
+                runCatching { fallbackSocket(device).also { it.connect() } }.getOrNull()?.let { it to "Canale diretto" }
+            }),
+            completion.submit(Callable {
+                runCatching {
+                    device.createRfcommSocketToServiceRecord(SERVICE_UUID).also { it.connect() }
+                }.getOrNull()?.let { it to "SDP" }
+            }),
+        )
+        try {
+            repeat(tasks.size) {
+                val future = completion.poll(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS) ?: return null
+                runCatching { future.get() }.getOrNull()?.let { return it }
+            }
+        } finally {
+            tasks.forEach { it.cancel(true) }
+        }
         return null
     }
 

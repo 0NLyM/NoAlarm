@@ -198,7 +198,7 @@ fun CalendarScreen() {
         NothingFab(
             Icons.Outlined.Add, "Nuova sveglia il ${Format.dateLabel(selected)}",
             onClick = {
-                val now = LocalTime.now()
+                val now = LocalTime.now().plusMinutes(1)
                 editing = Alarm(
                     id = System.currentTimeMillis(),
                     hour = now.hour,

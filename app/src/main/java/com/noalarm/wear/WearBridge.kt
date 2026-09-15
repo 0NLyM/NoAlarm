@@ -80,7 +80,10 @@ object WearBridge {
     @SuppressLint("MissingPermission") // verificato da hasPermission()
     private fun connect(): BluetoothSocket? {
         val adapter = BluetoothAdapter.getDefaultAdapter() ?: return null
-        adapter.cancelDiscovery() // una scansione in corso puo' far fallire il connect()
+        // Richiede BLUETOOTH_SCAN su API 31+ (non chiesto: l'eco usa solo BLUETOOTH_CONNECT),
+        // quindi lancia SecurityException - qui andrebbe persa dentro executor.execute()
+        // e farebbe crashare l'app. Solo un'ottimizzazione facoltativa: si tenta comunque.
+        runCatching { adapter.cancelDiscovery() }
         for (device in adapter.bondedDevices.orEmpty()) {
             val s = runCatching {
                 device.createRfcommSocketToServiceRecord(SERVICE_UUID).also { it.connect() }

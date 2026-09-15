@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -188,7 +189,7 @@ fun AlarmScreen() {
         NothingFab(
             Icons.Outlined.Add, "Nuova sveglia",
             onClick = {
-                val now = LocalTime.now()
+                val now = LocalTime.now().plusMinutes(1)
                 editing = Alarm(
                     id = System.currentTimeMillis(),
                     hour = now.hour,
@@ -238,6 +239,7 @@ fun BoxScope.UndoBarHost(alarm: Alarm?, onUndo: (Alarm) -> Unit, onExpire: () ->
         visible = alarm != null,
         modifier = Modifier
             .align(Alignment.BottomCenter)
+            .navigationBarsPadding()
             .padding(horizontal = 16.dp)
             .padding(bottom = NothingBarMargin + NothingBarHeight + 8.dp),
         enter = slideInVertically(tween(220)) { it } + fadeIn(tween(220)),
@@ -377,7 +379,7 @@ fun AlarmEditSheet(alarm: Alarm, onDismiss: () -> Unit, onDeleted: (Alarm) -> Un
     var current by remember(alarm.id) { mutableStateOf(alarm) }
     val isNew = remember(alarm.id) { Store.alarm(alarm.id) == null }
 
-    fun commit(a: Alarm) = AlarmScheduler.save(context, a.copy(enabled = true, snoozedUntil = 0L))
+    fun commit(a: Alarm) = AlarmScheduler.save(context, a.copy(snoozedUntil = 0L))
 
     if (!isNew) {
         // Ammortizzato: riprogrammare nel sistema non e' gratuito, non ha
@@ -405,7 +407,10 @@ fun AlarmEditSheet(alarm: Alarm, onDismiss: () -> Unit, onDeleted: (Alarm) -> Un
 
     ModalBottomSheet(
         onDismissRequest = ::dismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        // Si apre a meta' (fino al gruppo): trascinare in alto rivela le altre
+        // opzioni, invece di spalancarsi subito fino al bordo dello schermo e
+        // coprire il selettore dell'ora.
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
         containerColor = MaterialTheme.colorScheme.background,
     ) {
         AlarmEditor(
@@ -480,7 +485,9 @@ private fun AlarmEditor(
     val ringtone = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == Activity.RESULT_OK) {
             val uri: Uri? = r.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
-            draft = draft.copy(soundUri = uri?.toString())
+            // Picker con SHOW_SILENT: uri nullo qui significa "Nessuna" scelta esplicitamente,
+            // da non confondere con null = suoneria di sistema (mai aperto il picker).
+            draft = draft.copy(soundUri = uri?.toString() ?: Alarm.SOUND_NONE)
         }
     }
 
@@ -608,6 +615,12 @@ private fun AlarmEditor(
                 }
             }
 
+            Text(
+                "Trascinare in alto per altre opzioni",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             RowItem(
                 title = "Suoneria",
                 subtitle = ringtoneName(draft.soundUri),
@@ -616,11 +629,14 @@ private fun AlarmEditor(
                         Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
                             .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
                             .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                            .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                            .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
                             .putExtra(
                                 RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
-                                draft.soundUri?.let(Uri::parse)
-                                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                                when (draft.soundUri) {
+                                    Alarm.SOUND_NONE -> null
+                                    null -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                                    else -> Uri.parse(draft.soundUri)
+                                },
                             )
                     )
                 },
@@ -684,7 +700,7 @@ private fun AlarmEditor(
         }
 
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 32.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 20.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -792,6 +808,7 @@ fun glyphStyleLabel(style: GlyphStyle) = when (style) {
 @Composable
 fun ringtoneName(uri: String?): String {
     val context = LocalContext.current
+    if (uri == Alarm.SOUND_NONE) return "Nessuna"
     return remember(uri) {
         runCatching {
             RingtoneManager.getRingtone(

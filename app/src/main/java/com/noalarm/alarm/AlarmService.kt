@@ -93,6 +93,7 @@ class AlarmService : Service() {
     // --- suono ------------------------------------------------------------
 
     private fun play(alarm: Alarm) {
+        if (alarm.soundUri == Alarm.SOUND_NONE) return // sveglia silenziosa: solo vibrazione/eco
         val uri: Uri = alarm.soundUri?.let(Uri::parse)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: return

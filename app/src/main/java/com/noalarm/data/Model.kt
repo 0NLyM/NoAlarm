@@ -55,6 +55,11 @@ data class Alarm(
     /** Fa vibrare/squillare anche l'eco sul watch abbinato, se c'e'. */
     val ringOnWatch: Boolean = true,
 ) {
+    companion object {
+        /** [soundUri]: sveglia silenziosa (solo vibrazione/eco), scelta esplicitamente dall'utente. */
+        const val SOUND_NONE = "none"
+    }
+
     val repeating get() = days.isNotEmpty() && dateEpochDay == 0L
     val onDate get() = dateEpochDay > 0L
     val date: LocalDate? get() = if (onDate) LocalDate.ofEpochDay(dateEpochDay) else null

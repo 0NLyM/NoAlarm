@@ -58,13 +58,15 @@ La priorita' per classe rimane un'euristica: puo' sbagliare, e resta comunque un
 ### Strumento di Prova (v1.4.18)
 Impostazioni → sezione "Sveglia" → "Prova la connessione con l'orologio" (`WearTestSheet.kt`), stesso schema della prova Glyph: `WearBridge.status` (`StateFlow<WearStatus>`) espone permesso, dispositivi accoppiati, a chi/con che metodo si è connesso, tempo di connessione, se il messaggio è stato scritto, se e in quanto è arrivato l'ack, ultimo errore. `WearBridge.test()` manda lo stesso `ACTION_RING` id 0 della "Prova" locale sul watch; `BridgeService.handle()` ora rimanda **sempre** lo stesso `ACTION_RING` come conferma di ricezione subito dopo aver fatto suonare l'eco (per una sveglia vera il telefono lo ignora, non c'è branch per `ACTION_RING` in `listenForReply()`). Serve a distinguere "non si connette", "si connette ma non scrive", "scrive ma il watch non risponde" (es. APK watch non aggiornato) invece di scoprirlo solo quando una sveglia vera non arriva.
 
-### Schermata Sveglia sul Watch: Storia Completa (fino a v1.1.8)
+### Schermata Sveglia sul Watch: Storia Completa (fino a v1.1.9)
 1. **v1.4.18**: solo notifica, mai `RingActivity`. Causa: da Android 14 (API 34, il watch monta `targetSdk 35`) dichiarare `USE_FULL_SCREEN_INTENT` nel manifest non basta piu' — serve consenso esplicito in Impostazioni, altrimenti `setFullScreenIntent()` degrada in silenzio a notifica normale. **Fix v1.4.19**: richiesta del consenso via `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`.
 2. **v1.1.5**: persisteva anche col consenso concesso E a schermo spento/ambient — la condizione in cui il fullScreenIntent dovrebbe auto-aprirsi da solo. **Fix v1.1.6**: `BridgeService.ring()` tenta anche `startActivity()` diretto su `RingActivity`, IN PARALLELO alla notifica con fullScreenIntent (non al posto di).
 3. **v1.1.6**: la doppia strada creava una corsa fra le due UI. Riscontrato dall'utente: **a schermo acceso** l'avvio diretto vinceva sempre (schermata piena, ma con la notifica che si sovrapponeva sopra); **a schermo spento** l'avvio diretto non arrivava mai in tempo (restava solo la notifica) — il vero problema non era un blocco BAL sull'avvio diretto, ma il sistema che lo rimandava mentre la CPU era in doze con lo schermo spento.
    - **Fix v1.1.7**: tolta la notifica dell'eco (`CH_RING`) e il fullScreenIntent — solo piu' `startActivity()` diretto, preceduto da un `PowerManager.PARTIAL_WAKE_LOCK` di 10 s che tiene sveglia la CPU quel tanto che basta perche' il sistema esegua subito l'avvio invece di rimandarlo in doze; da li' `setShowWhenLocked`/`setTurnScreenOn` di `RingActivity` (gia' presenti) accendono davvero lo schermo. Rimossi anche il permesso `USE_FULL_SCREEN_INTENT` e il relativo avviso in `MainActivity.kt`, diventati inutili.
 4. **v1.1.7**: la schermata piena ora funzionava anche a schermo spento, ma dopo pochi secondi a schermo spento la sincronizzazione smetteva del tutto di funzionare finche' l'utente non riapriva l'app. Ipotesi: il `BluetoothServerSocket` in ascolto (`acceptLoop()`) resta "vivo" ma inerte (`accept()` bloccato per sempre) se il chip Bluetooth si riavvia durante lo standby a schermo spento — non un errore che l'accept() nota da solo.
    - **Fix v1.1.8**: `BridgeService` registra un `BroadcastReceiver` dinamico su `ACTION_SCREEN_ON` che chiude `serverSocket` alla riaccensione dello schermo, forzando la `IOException` che sblocca `accept()` e lo fa ricreare da capo — nessun polling continuo, scatta solo sugli eventi di riaccensione. Aggiunta anche la richiesta di esenzione dall'ottimizzazione batteria (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, come rete di sicurezza in caso il vero problema fosse il servizio ucciso dal battery manager del produttore invece del socket).
+5. **v1.1.8**: non bastava. Prova dell'utente (screenshot `WearTestSheet`): connessione riuscita in 505 ms con ack in 37 ms — quindi quando l'app e' aperta tutto funziona benissimo — ma dopo un po' a schermo spento la sveglia non arriva piu' finche' non si riapre l'app, e **l'icona del servizio in primo piano resta visibile** per tutto il tempo: `BridgeService` non viene distrutto (`onDestroy()` mai chiamato), quindi ne' il ricevitore `ACTION_SCREEN_ON` ne' l'ipotesi "servizio ucciso dal battery manager" (Causa 9) spiegano il sintomo. Piu' probabile: il sistema sospende la CPU/i thread dell'app a schermo spento pur lasciando il `Service` "vivo" (processo congelato, non distrutto) — ne' l'`acceptLoop()` ne' il `BroadcastReceiver` dinamico riescono a girare finche' qualcosa (aprire l'app) non risveglia il processo.
+   - **Fix v1.1.9**: wake lock (`PowerManager.PARTIAL_WAKE_LOCK`) acquisito in `onStartCommand()` e tenuto per **tutta la vita del servizio** (non piu' solo per 10 s durante lo squillo, rimosso da `ring()` perche' ridondante), rilasciato in `onDestroy()`. Costa piu' batteria di un approccio "leggero", ma e' l'unico modo per garantire che la CPU non venga mai sospesa mentre il servizio deve restare in ascolto.
 
 ### Vibrazione sul Watch
 **Bug risolto in v1.4.15**: `RingActivity` usava `createWaveform(..., repeat=0)` (loop infinito) senza mai chiamare `vibrator.cancel()` → continuava a vibrare anche dopo Spegni/Posticipa o stop dal telefono.
@@ -87,8 +89,8 @@ Prima usava il Material3 di default (schema colori chiaro/scuro di sistema), nes
 
 ## Versioni Attuali
 
-- **App**: v1.4.23 (versionCode 44)
-- **Watch**: v1.1.8 (versionCode 11)
+- **App**: v1.4.24 (versionCode 45)
+- **Watch**: v1.1.9 (versionCode 12)
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
 
@@ -122,8 +124,11 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 8. **Causa 8 (v1.1.7, fix parziale)**: la notifica e l'avvio diretto pubblicati insieme creavano la corsa; a schermo spento l'avvio diretto veniva rimandato dal sistema mentre la CPU era in doze, non bloccato.
    - **Fix**: tolta del tutto la notifica dell'eco. Solo `startActivity()` diretto, preceduto da un `PowerManager.PARTIAL_WAKE_LOCK` di 10 s che tiene sveglia la CPU perche' il sistema lo esegua subito invece di rimandarlo.
    - Schermata piena confermata funzionante anche a schermo spento, ma e' emerso un problema nuovo: la sincronizzazione smette di funzionare del tutto dopo pochi secondi a schermo spento. Vedi Causa 9.
-9. **Causa 9 (v1.1.8, ipotesi)**: il `BluetoothServerSocket` in ascolto resta "vivo" ma inerte (`accept()` bloccato per sempre, mai un errore) se il chip Bluetooth si riavvia durante lo standby a schermo spento — solo riaprire l'app (che riavvia `BridgeService` da capo) lo sbloccava.
-   - **Fix**: `BroadcastReceiver` su `ACTION_SCREEN_ON` che chiude `serverSocket` alla riaccensione, forzando l'`IOException` che sblocca `accept()` e lo fa ricreare. Aggiunta anche la richiesta di esenzione dall'ottimizzazione batteria come rete di sicurezza (nel caso la vera causa fosse invece il servizio ucciso dal battery manager del produttore).
+9. **Causa 9 (v1.1.8, ipotesi sbagliata)**: si era ipotizzato che il `BluetoothServerSocket` in ascolto restasse "vivo" ma inerte (`accept()` bloccato per sempre) se il chip Bluetooth si riavvia durante lo standby, o che il servizio venisse ucciso dal battery manager del produttore.
+   - **Fix**: `BroadcastReceiver` su `ACTION_SCREEN_ON` per ricreare il socket, piu' richiesta di esenzione dall'ottimizzazione batteria.
+   - Non bastava: l'icona del servizio in primo piano restava visibile per tutto il tempo (`BridgeService` mai distrutto), quindi non era ne' un socket morto ne' un servizio ucciso. Vedi Causa 10.
+10. **Causa 10 (v1.1.9, causa reale)**: il sistema sospende la CPU/i thread dell'app a schermo spento pur lasciando il `Service` "vivo" (processo congelato, non distrutto) — ne' `acceptLoop()` ne' il `BroadcastReceiver` dinamico riescono a girare finche' qualcosa (aprire l'app) non risveglia il processo.
+   - **Fix**: `PowerManager.PARTIAL_WAKE_LOCK` acquisito in `onStartCommand()` e tenuto per tutta la vita del servizio (non piu' solo 10 s durante lo squillo), rilasciato in `onDestroy()`.
 
 ### Lint Failure `wear:lintVitalRelease`
 ✅ **Risolto in v1.4.13**: `play-services-wearable` tirava transitive fragment old, aggiunto `libs.androidx.fragment.ktx`. Poi rimosso tutto `play-services-wearable` quando passato a RFCOMM.
@@ -164,4 +169,4 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 
 ---
 
-**Ultima revisione**: v1.4.23/1.1.8 (16 Sep 2026) — la sincronizzazione BT si interrompeva dopo pochi secondi a schermo spento (socket in ascolto ricreato alla riaccensione dello schermo), aggiunta anche l'esenzione dall'ottimizzazione batteria. App non toccata in questo giro, versione avanzata solo per continuita' del tag di release.
+**Ultima revisione**: v1.4.24/1.1.9 (16 Sep 2026) — causa reale della sincronizzazione che si fermava a schermo spento: CPU sospesa dal sistema pur con servizio vivo, non un socket morto. Wake lock tenuto per tutta la vita del servizio invece che solo 10s. App non toccata in questo giro, versione avanzata solo per continuita' del tag di release.

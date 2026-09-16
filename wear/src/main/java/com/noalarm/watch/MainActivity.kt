@@ -1,9 +1,13 @@
 package com.noalarm.watch
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,6 +46,15 @@ class MainActivity : ComponentActivity() {
             BridgeService.start(this)
         } else {
             requestBluetooth.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        }
+        // Senza l'esenzione, il sistema (o il battery manager del produttore)
+        // puo' chiudere BridgeService dopo un po' a schermo spento, interrompendo
+        // l'eco finche' non si riapre l'app: chiesta una sola volta, subito.
+        val pm = getSystemService(PowerManager::class.java)
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            runCatching {
+                startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+            }
         }
         setContent {
             NoAlarmWatchTheme {

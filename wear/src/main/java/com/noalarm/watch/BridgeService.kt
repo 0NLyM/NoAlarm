@@ -8,8 +8,10 @@ import android.app.Service
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -35,6 +37,16 @@ class BridgeService : Service() {
     @Volatile private var running = false
     @Volatile private var activeSocket: BluetoothSocket? = null
 
+    // Il socket in ascolto puo' restare "vivo" ma inerte (accept() bloccato per
+    // sempre) se il chip Bluetooth si riavvia durante lo standby a schermo
+    // spento: alla riaccensione lo si chiude per sicurezza, forzando la
+    // IOException che sblocca accept() nell'acceptLoop e lo fa ricreare da capo.
+    private val screenOnReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            runCatching { serverSocket?.close() }
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -43,6 +55,9 @@ class BridgeService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(CH_STATUS, "In ascolto del telefono", NotificationManager.IMPORTANCE_MIN)
+        )
+        ContextCompat.registerReceiver(
+            this, screenOnReceiver, IntentFilter(Intent.ACTION_SCREEN_ON), ContextCompat.RECEIVER_NOT_EXPORTED,
         )
     }
 
@@ -136,6 +151,7 @@ class BridgeService : Service() {
 
     override fun onDestroy() {
         running = false
+        runCatching { unregisterReceiver(screenOnReceiver) }
         runCatching { serverSocket?.close() }
         runCatching { activeSocket?.close() }
         if (instance == this) instance = null

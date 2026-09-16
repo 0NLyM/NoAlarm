@@ -32,8 +32,8 @@ android {
         // merge del manifest fallirebbe. Coerente con l'unico device che la usa.
         minSdk = 33
         targetSdk = 35
-        versionCode = 43
-        versionName = "1.4.22"
+        versionCode = 44
+        versionName = "1.4.23"
         vectorDrawables.useSupportLibrary = true
     }
 

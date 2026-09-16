@@ -58,7 +58,20 @@ La priorita' per classe rimane un'euristica: puo' sbagliare, e resta comunque un
 ### Strumento di Prova (v1.4.18)
 Impostazioni → sezione "Sveglia" → "Prova la connessione con l'orologio" (`WearTestSheet.kt`), stesso schema della prova Glyph: `WearBridge.status` (`StateFlow<WearStatus>`) espone permesso, dispositivi accoppiati, a chi/con che metodo si è connesso, tempo di connessione, se il messaggio è stato scritto, se e in quanto è arrivato l'ack, ultimo errore. `WearBridge.test()` manda lo stesso `ACTION_RING` id 0 della "Prova" locale sul watch; `BridgeService.handle()` ora rimanda **sempre** lo stesso `ACTION_RING` come conferma di ricezione subito dopo aver fatto suonare l'eco (per una sveglia vera il telefono lo ignora, non c'è branch per `ACTION_RING` in `listenForReply()`). Serve a distinguere "non si connette", "si connette ma non scrive", "scrive ma il watch non risponde" (es. APK watch non aggiornato) invece di scoprirlo solo quando una sveglia vera non arriva.
 
-### Schermata Sveglia sul Watch: Storia Completa (fino a v1.1.9)
+### Sync Sveglie via AlarmManager (v1.2.0 watch / v1.4.25 app)
+**Problema**: la Causa 10 (sotto) risolve l'affidabilita' dell'eco live, ma solo tenendo un `PARTIAL_WAKE_LOCK` per tutta la vita di `BridgeService` — CPU mai sospesa, costo in batteria non piu' accettabile per un uso quotidiano. La causa di fondo era architetturale: la sveglia sul watch dipendeva da una connessione Bluetooth *live* che il telefono deve far arrivare esattamente all'istante giusto, e l'unico modo per garantirla era impedire sempre alla CPU del watch di dormire.
+
+**Soluzione**: il watch non aspetta piu' un push in tempo reale — programma da solo, localmente, l'orario in cui suonare, con lo stesso mezzo Doze-proof che il telefono usa gia' per le sue sveglie (`AlarmManager.setExactAndAllowWhileIdle`). Il Bluetooth resta, ma per due usi molto piu' leggeri:
+1. **Sync della programmazione**: ogni volta che sul telefono cambia il prossimo squillo di una sveglia con l'eco attiva (salva, cancella, rinvio, spegnimento, `syncAll` al boot/avvio app), `WearBridge.syncSchedule()` manda al watch l'elenco **completo** (non un diff) delle sveglie attive con eco: id, istante assoluto gia' calcolato (`nextTrigger()`), etichetta (`ACTION_SYNC = 5`). Il watch (`WatchAlarmScheduler.sync()`) calcola il diff da solo (`SharedPreferences` con le id gia' programmate) e programma/cancella i `PendingIntent` di conseguenza.
+2. **Eco live + staffetta rinvio/spegni**: `BridgeService`/`WearBridge.ringOnWatches()`/`ACTION_RING` restano com'erano — quando la sveglia suona per davvero sul telefono, se il watch e' raggiungibile in quel momento arriva anche l'eco "live" (ridondante rispetto a quella locale, ma piu' pronta se il watch e' sveglio), e la stessa connessione resta il canale per `ACTION_SNOOZE`/`ACTION_DISMISS` da un dispositivo all'altro. Questo e' l'unico momento in cui serve una connessione BT attiva — esattamente come proposto: "attivare il listener solo quando la sveglia suona su entrambi i dispositivi".
+
+**Chi suona il watch adesso**: `WatchAlarmReceiver`, un `BroadcastReceiver` registrato in manifest e innescato dall'`AlarmManager` — a differenza di un `Service`, un receiver innescato dall'AlarmManager e' esente dai limiti di avvio in background (BAL), quindi puo' chiamare `startActivity()` su `RingActivity` direttamente, senza fullScreenIntent e senza bisogno che nulla sia gia' in esecuzione. Suona quindi anche se `BridgeService` e' inerte o l'app e' stata "congelata" (Causa 10).
+
+**Wake lock ridotto**: con l'orario garantito dall'AlarmManager, `BridgeService` non deve piu' restare sveglio 24/7 solo per non perdere lo squillo — il wake lock permanente della Causa 10/v1.1.9 e' stato tolto. Resta solo un wake lock breve (10 s) dentro `ring()`, come prima della v1.1.9, per il solo caso dell'eco live.
+
+**Compromesso accettato**: la programmazione (`ACTION_SYNC`) arriva ancora via Bluetooth, quindi se il processo del watch e' congelato nel preciso istante in cui il telefono la manda, quella singola sync puo' non arrivare — il watch continuera' a suonare secondo l'ultima programmazione ricevuta con successo (mai silenzio totale, nel peggiore dei casi un'eco con orario non aggiornatissimo). Piu' punti di sync nel tempo (salva/cancella/rinvio/spegni/boot/avvio app) e l'auto-guarigione gia' presente (`screenOnReceiver` ricrea il socket alla riaccensione schermo) coprono la maggior parte dei casi reali senza pagare il costo di un wake lock permanente.
+
+### Schermata Sveglia sul Watch: Storia Completa (fino a v1.1.9, superata in v1.2.0 — vedi sopra)
 1. **v1.4.18**: solo notifica, mai `RingActivity`. Causa: da Android 14 (API 34, il watch monta `targetSdk 35`) dichiarare `USE_FULL_SCREEN_INTENT` nel manifest non basta piu' — serve consenso esplicito in Impostazioni, altrimenti `setFullScreenIntent()` degrada in silenzio a notifica normale. **Fix v1.4.19**: richiesta del consenso via `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`.
 2. **v1.1.5**: persisteva anche col consenso concesso E a schermo spento/ambient — la condizione in cui il fullScreenIntent dovrebbe auto-aprirsi da solo. **Fix v1.1.6**: `BridgeService.ring()` tenta anche `startActivity()` diretto su `RingActivity`, IN PARALLELO alla notifica con fullScreenIntent (non al posto di).
 3. **v1.1.6**: la doppia strada creava una corsa fra le due UI. Riscontrato dall'utente: **a schermo acceso** l'avvio diretto vinceva sempre (schermata piena, ma con la notifica che si sovrapponeva sopra); **a schermo spento** l'avvio diretto non arrivava mai in tempo (restava solo la notifica) — il vero problema non era un blocco BAL sull'avvio diretto, ma il sistema che lo rimandava mentre la CPU era in doze con lo schermo spento.
@@ -89,8 +102,8 @@ Prima usava il Material3 di default (schema colori chiaro/scuro di sistema), nes
 
 ## Versioni Attuali
 
-- **App**: v1.4.24 (versionCode 45)
-- **Watch**: v1.1.9 (versionCode 12)
+- **App**: v1.4.25 (versionCode 46)
+- **Watch**: v1.2.0 (versionCode 13)
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
 
@@ -129,6 +142,9 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
    - Non bastava: l'icona del servizio in primo piano restava visibile per tutto il tempo (`BridgeService` mai distrutto), quindi non era ne' un socket morto ne' un servizio ucciso. Vedi Causa 10.
 10. **Causa 10 (v1.1.9, causa reale)**: il sistema sospende la CPU/i thread dell'app a schermo spento pur lasciando il `Service` "vivo" (processo congelato, non distrutto) — ne' `acceptLoop()` ne' il `BroadcastReceiver` dinamico riescono a girare finche' qualcosa (aprire l'app) non risveglia il processo.
    - **Fix**: `PowerManager.PARTIAL_WAKE_LOCK` acquisito in `onStartCommand()` e tenuto per tutta la vita del servizio (non piu' solo 10 s durante lo squillo), rilasciato in `onDestroy()`.
+   - Risolveva l'affidabilita', ma con un costo in batteria non piu' accettabile per un uso quotidiano (CPU mai sospesa). Vedi Causa 11.
+11. **Causa 11 (v1.2.0, redesign architetturale)**: la causa di fondo non era un bug da correggere ma un limite del disegno — far dipendere l'orario dello squillo da una connessione Bluetooth *live* imponeva di impedire sempre alla CPU di dormire, l'unico modo per garantirla.
+    - **Fix**: il watch programma da solo l'orario via `AlarmManager.setExactAndAllowWhileIdle` (Doze-proof per natura, nessun wake lock permanente necessario), sincronizzato dal telefono a ogni cambio (`WearBridge.syncSchedule()` → `ACTION_SYNC` → `WatchAlarmScheduler`). Il Bluetooth resta solo per l'eco live e la staffetta rinvio/spegni mentre la sveglia suona su entrambi. Vedi "Sync Sveglie via AlarmManager" sopra.
 
 ### Lint Failure `wear:lintVitalRelease`
 ✅ **Risolto in v1.4.13**: `play-services-wearable` tirava transitive fragment old, aggiunto `libs.androidx.fragment.ktx`. Poi rimosso tutto `play-services-wearable` quando passato a RFCOMM.
@@ -156,12 +172,15 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 |------|-------|
 | `app/build.gradle.kts` | Versioning app, dipendenze phone |
 | `wear/build.gradle.kts` | Versioning watch, signing, dipendenze watch |
-| `app/src/main/java/com/noalarm/wear/WearBridge.kt` | RFCOMM client (phone) |
-| `wear/src/main/java/com/noalarm/watch/BridgeService.kt` | RFCOMM server (watch), foreground service |
+| `app/src/main/java/com/noalarm/wear/WearBridge.kt` | RFCOMM client (phone): eco live + `syncSchedule()` |
+| `wear/src/main/java/com/noalarm/watch/BridgeService.kt` | RFCOMM server (watch), foreground service, riceve `ACTION_SYNC` |
+| `wear/src/main/java/com/noalarm/watch/WatchAlarmScheduler.kt` | Programma/cancella sveglie locali via `AlarmManager` (Doze-proof) |
+| `wear/src/main/java/com/noalarm/watch/WatchAlarmReceiver.kt` | Riceve la sveglia da `AlarmManager`, apre `RingActivity` (esente BAL) |
 | `wear/src/main/java/com/noalarm/watch/RingActivity.kt` | UI ring, vibrazione watch |
 | `wear/src/main/java/com/noalarm/watch/BootReceiver.kt` | Restart BridgeService su boot |
 | `wear/src/main/AndroidManifest.xml` | Permessi, FGS type, meta-data standalone |
-| `app/src/main/java/com/noalarm/alarm/AlarmService.kt` | Ring logic phone, chiama `WearBridge.ringOnWatches()` |
+| `app/src/main/java/com/noalarm/alarm/AlarmScheduler.kt` | Scheduling phone; chiama `WearBridge.syncSchedule()` su save/delete/syncAll |
+| `app/src/main/java/com/noalarm/alarm/AlarmService.kt` | Ring logic phone, chiama `WearBridge.ringOnWatches()`/`syncSchedule()` |
 | `app/src/main/java/com/noalarm/ui/WearTestSheet.kt` | Schermata di prova connessione watch (Impostazioni) |
 | `app/src/main/java/com/noalarm/ui/WearDevicePicker.kt` | Selettore manuale del watch per l'eco (Impostazioni) |
 | `wear/src/main/java/com/noalarm/watch/Theme.kt` | Palette Nothing (duplicata dal telefono) per il watch |
@@ -169,4 +188,4 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 
 ---
 
-**Ultima revisione**: v1.4.24/1.1.9 (16 Sep 2026) — causa reale della sincronizzazione che si fermava a schermo spento: CPU sospesa dal sistema pur con servizio vivo, non un socket morto. Wake lock tenuto per tutta la vita del servizio invece che solo 10s. App non toccata in questo giro, versione avanzata solo per continuita' del tag di release.
+**Ultima revisione**: v1.4.25/1.2.0 (16 Sep 2026) — redesign architetturale su richiesta dell'utente per eliminare il wake lock permanente (v1.1.9): il watch ora programma da solo l'orario via `AlarmManager` (Doze-proof), sincronizzato dal telefono a ogni cambio; il Bluetooth resta solo per l'eco live e la staffetta rinvio/spegni mentre la sveglia suona su entrambi i dispositivi. Vedi "Sync Sveglie via AlarmManager" e Causa 11.

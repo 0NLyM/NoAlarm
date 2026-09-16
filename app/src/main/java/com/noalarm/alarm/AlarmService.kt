@@ -205,6 +205,7 @@ class AlarmService : Service() {
         snoozeCount.value += 1
         Store.updateAlarm(alarm.id) { it.copy(snoozedUntil = until) }
         Store.alarm(alarm.id)?.let { AlarmScheduler.schedule(this, it) }
+        WearBridge.syncSchedule(this)
         NotificationHelper.showSnoozed(this, alarm, until)
         if (alarm.glyph) GlyphController.snoozed(this, until)
         // La matrice mostra il countdown per 10 s, poi si spegne per non consumare.
@@ -224,6 +225,7 @@ class AlarmService : Service() {
                 )
             }
             Store.alarm(alarm.id)?.let { AlarmScheduler.schedule(this, it) }
+            WearBridge.syncSchedule(this)
             NotificationHelper.cancelSnoozed(this, alarm.id)
         }
         snoozeCount.value = 0

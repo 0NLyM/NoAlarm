@@ -60,6 +60,7 @@ object WearBridge {
     private const val ACTION_STOP = 2
     private const val ACTION_SNOOZE = 3
     private const val ACTION_DISMISS = 4
+    private const val ACTION_SYNC = 5
     // Limite per dispositivo (canale diretto + SDP in parallelo): con parecchi
     // dispositivi accoppiati non raggiungibili, evita di sommare minuti d'attesa.
     private const val CONNECT_TIMEOUT_MS = 4000L
@@ -82,6 +83,34 @@ object WearBridge {
                 }
                 listenForReply(context, s)
             }
+        }
+    }
+
+    /**
+     * Manda al watch l'elenco completo (non un diff) delle sveglie attive con
+     * eco: le programma localmente via AlarmManager (WatchAlarmScheduler), cosi'
+     * suonano da sole in orario anche senza una connessione Bluetooth in quel
+     * momento - a differenza di [ringOnWatches], che deve arrivare esattamente
+     * all'istante giusto. Va richiamata a ogni cambio che sposta il prossimo
+     * squillo di una sveglia con l'eco attiva (salvataggio, cancellazione,
+     * rinvio, spegnimento).
+     */
+    fun syncSchedule(context: Context) {
+        if (!hasPermission(context)) return
+        val entries = Store.alarms.value
+            .filter { it.enabled && it.ringOnWatch }
+            .mapNotNull { a -> a.nextTrigger()?.let { Triple(a.id, it, a.label) } }
+        executor.execute {
+            val s = connect() ?: return@execute
+            runCatching {
+                DataOutputStream(s.outputStream).apply {
+                    writeByte(ACTION_SYNC)
+                    writeInt(entries.size)
+                    entries.forEach { (id, at, label) -> writeLong(id); writeLong(at); writeUTF(label) }
+                    flush()
+                }
+            }
+            runCatching { s.close() }
         }
     }
 

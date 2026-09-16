@@ -34,7 +34,6 @@ import java.util.UUID
 class BridgeService : Service() {
 
     private var serverSocket: BluetoothServerSocket? = null
-    private var wakeLock: PowerManager.WakeLock? = null
     @Volatile private var running = false
     @Volatile private var activeSocket: BluetoothSocket? = null
 
@@ -79,15 +78,6 @@ class BridgeService : Service() {
         )
         if (!running) {
             running = true
-            // L'icona del servizio in primo piano resta visibile anche se il
-            // sistema sospende la CPU dell'app a schermo spento (osservato: la
-            // socket in ascolto smette di funzionare dopo pochi secondi, si
-            // sblocca solo riaprendo l'app) - un wake lock tenuto per tutta la
-            // vita del servizio, non solo durante lo squillo, e' l'unico modo
-            // per garantire che accept() giri davvero anche a schermo spento.
-            wakeLock = getSystemService(PowerManager::class.java)
-                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "noalarm:bridge")
-                .also { it.acquire() }
             Thread(::acceptLoop, "noalarm-bridge-accept").start()
         }
         return START_STICKY
@@ -128,6 +118,13 @@ class BridgeService : Service() {
                     respond(ACTION_RING)
                 }
                 ACTION_STOP -> RingActivity.stop()
+                ACTION_SYNC -> {
+                    val entries = runCatching {
+                        val count = input.readInt()
+                        (0 until count).map { Triple(input.readLong(), input.readLong(), input.readUTF()) }
+                    }.getOrNull() ?: break
+                    WatchAlarmScheduler.sync(this, entries)
+                }
             }
         }
         runCatching { socket.close() }
@@ -137,14 +134,19 @@ class BridgeService : Service() {
     /**
      * Solo la schermata a schermo intero, niente notifica: postarla in parallelo
      * al fullScreenIntent (v1.1.6) creava una corsa fra le due - a volte
-     * comparivano entrambe sovrapposte, a volte solo la notifica. Il wake lock
-     * tenuto per tutta la vita del servizio (vedi onStartCommand) tiene sveglia
-     * la CPU anche qui, cosi' il sistema esegue subito l'avvio invece di
-     * rimandarlo mentre lo schermo e' spento - da li' in poi ci pensano
-     * setShowWhenLocked/setTurnScreenOn di RingActivity ad accendere lo schermo.
+     * comparivano entrambe sovrapposte, a volte solo la notifica. Un wake lock
+     * breve (non piu' per tutta la vita del servizio, vedi WatchAlarmScheduler)
+     * tiene sveglia la CPU giusto per questa chiamata, cosi' il sistema esegue
+     * subito l'avvio invece di rimandarlo mentre lo schermo e' spento - da li'
+     * in poi ci pensano setShowWhenLocked/setTurnScreenOn di RingActivity ad
+     * accendere lo schermo.
      */
     private fun ring(id: Long, label: String) {
+        val wl = getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "noalarm:bridge-ring")
+            .apply { acquire(10_000) }
         runCatching { startActivity(RingActivity.ringIntent(this, id, label)) }
+        runCatching { if (wl.isHeld) wl.release() }
     }
 
     /** Rimanda al telefono, sulla connessione che ha fatto suonare questa sveglia, l'esito. */
@@ -158,7 +160,6 @@ class BridgeService : Service() {
     override fun onDestroy() {
         running = false
         runCatching { unregisterReceiver(screenOnReceiver) }
-        wakeLock?.let { if (it.isHeld) it.release() }
         runCatching { serverSocket?.close() }
         runCatching { activeSocket?.close() }
         if (instance == this) instance = null
@@ -173,6 +174,7 @@ class BridgeService : Service() {
         const val ACTION_STOP = 2
         const val ACTION_SNOOZE = 3
         const val ACTION_DISMISS = 4
+        const val ACTION_SYNC = 5
         private const val ID_STATUS = 2
         private const val CH_STATUS = "status"
 

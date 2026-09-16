@@ -52,8 +52,6 @@ fun SettingsScreen() {
     val context = LocalContext.current
     val s by Store.settings.collectAsStateWithLifecycle()
     var glyphTest by remember { mutableStateOf(false) }
-    var wearTest by remember { mutableStateOf(false) }
-    var wearDevicePicker by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -84,16 +82,6 @@ fun SettingsScreen() {
             Modifier.padding(horizontal = 4.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        RowItem(
-            title = "Orologio da usare per l'eco",
-            subtitle = s.watchDeviceName.ifBlank { "Rilevamento automatico" },
-            onClick = { wearDevicePicker = true },
-        )
-        RowItem(
-            title = "Prova la connessione con l'orologio",
-            subtitle = "Manda un'eco di prova e mostra dove si ferma se non arriva",
-            onClick = { wearTest = true },
         )
 
         SectionLabel("Comandi mentre suona")
@@ -182,12 +170,6 @@ fun SettingsScreen() {
     }
 
     if (glyphTest) GlyphTestSheet { glyphTest = false }
-    if (wearTest) WearTestSheet { wearTest = false }
-    if (wearDevicePicker) WearDevicePicker(
-        current = s.watchDeviceAddress,
-        onPick = { d -> Store.update { it.copy(watchDeviceAddress = d?.address ?: "", watchDeviceName = d?.name ?: "") } },
-        onDismiss = { wearDevicePicker = false },
-    )
 }
 
 /** Riga che cicla fra i valori possibili a ogni tocco: niente menu, niente dialog. */

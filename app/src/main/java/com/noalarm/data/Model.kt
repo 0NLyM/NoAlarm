@@ -136,10 +136,6 @@ data class Settings(
     val defaultAutoSilenceMinutes: Int = 10,
     /** Valore di partenza di [Alarm.ringOnWatch] per le sveglie nuove. */
     val defaultRingOnWatch: Boolean = true,
-    /** MAC del watch scelto a mano per l'eco. Vuoto = rilevamento automatico. */
-    val watchDeviceAddress: String = "",
-    /** Nome del watch scelto, solo per mostrarlo nelle Impostazioni senza rileggere il Bluetooth. */
-    val watchDeviceName: String = "",
     val volumeKeyAction: KeyAction = KeyAction.SNOOZE,
     val powerKeyAction: KeyAction = KeyAction.DISMISS,
     val flipAction: KeyAction = KeyAction.NONE,

@@ -64,7 +64,13 @@ object NotificationHelper {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    /** Notifica a schermo intero mostrata mentre la sveglia suona. */
+    /**
+     * Notifica a schermo intero mostrata mentre la sveglia suona. Wear OS la
+     * mostra anche sull'orologio abbinato via bridging automatico di sistema
+     * (nessun codice/dipendenza aggiuntiva) a meno che [Alarm.ringOnWatch] sia
+     * disattivato, nel qual caso [NotificationCompat.WearableExtender.setLocalOnly]
+     * la esclude dal bridging.
+     */
     fun ringing(c: Context, alarm: Alarm): Notification {
         val full = PendingIntent.getActivity(
             c, alarm.id.hashCode(),
@@ -87,6 +93,7 @@ object NotificationHelper {
             .setContentIntent(full)
             .addAction(0, "POSTICIPA", action(c, ActionReceiver.SNOOZE, alarm.id))
             .addAction(0, "SPEGNI", action(c, ActionReceiver.DISMISS, alarm.id))
+            .extend(NotificationCompat.WearableExtender().setLocalOnly(!alarm.ringOnWatch))
             .build()
     }
 

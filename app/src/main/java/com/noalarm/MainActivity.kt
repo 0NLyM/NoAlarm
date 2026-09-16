@@ -95,15 +95,11 @@ class MainActivity : ComponentActivity() {
         pendingTab = tabFrom(intent)
 
         val ask = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
-        val askBluetooth = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
         setContent {
             NoAlarmTheme {
                 LaunchedEffect(Unit) {
                     if (Build.VERSION.SDK_INT >= 33) ask.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    // Senza questo l'eco della sveglia sul watch (vedi wear/WearBridge.kt)
-                    // non puo' aprire la connessione Bluetooth verso di lui.
-                    askBluetooth.launch(Manifest.permission.BLUETOOTH_CONNECT)
                     // Senza questo permesso speciale le sveglie possono ritardare o non
                     // suonare affatto: va chiesto subito, non solo se l'utente trova la riga
                     // in Impostazioni.

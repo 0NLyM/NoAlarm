@@ -8,7 +8,6 @@ import android.os.Build
 import com.noalarm.MainActivity
 import com.noalarm.data.Alarm
 import com.noalarm.data.Store
-import com.noalarm.wear.WearBridge
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -52,7 +51,6 @@ object AlarmScheduler {
         pruneExpired(c)
         Store.alarms.value.forEach { schedule(c, it) }
         scheduleBedtime(c)
-        WearBridge.syncSchedule(c)
     }
 
     fun schedule(c: Context, alarm: Alarm) {
@@ -96,13 +94,11 @@ object AlarmScheduler {
     fun save(c: Context, alarm: Alarm) {
         Store.putAlarm(alarm)
         schedule(c, alarm)
-        WearBridge.syncSchedule(c)
     }
 
     fun delete(c: Context, id: Long) {
         cancel(c, id)
         Store.removeAlarm(id)
-        WearBridge.syncSchedule(c)
     }
 
     /** La prossima sveglia che suonera', con il suo istante. */

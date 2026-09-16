@@ -4,7 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothServerSocket
@@ -15,8 +14,8 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import java.io.DataInputStream
@@ -44,9 +43,6 @@ class BridgeService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(CH_STATUS, "In ascolto del telefono", NotificationManager.IMPORTANCE_MIN)
-        )
-        nm.createNotificationChannel(
-            NotificationChannel(CH_RING, "Eco sveglia", NotificationManager.IMPORTANCE_HIGH)
         )
     }
 
@@ -106,10 +102,7 @@ class BridgeService : Service() {
                     // (WearBridge.test()): per una sveglia vera il telefono la ignora.
                     respond(ACTION_RING)
                 }
-                ACTION_STOP -> {
-                    NotificationManagerCompat.from(this).cancel(ID_RING)
-                    RingActivity.stop()
-                }
+                ACTION_STOP -> RingActivity.stop()
             }
         }
         runCatching { socket.close() }
@@ -117,32 +110,20 @@ class BridgeService : Service() {
     }
 
     /**
-     * Il fullScreenIntent della notifica sotto (stesso meccanismo del telefono)
-     * dovrebbe aprire RingActivity da solo quando lo schermo e' spento/in
-     * ambient - ma su questo stack Wear OS non succede nemmeno a schermo
-     * spento, restando solo una notifica da toccare. Si tenta quindi anche
-     * l'avvio diretto: se il sistema lo blocca (nessuna eccezione BAL
-     * garantita per un servizio in background) non succede nulla, e resta
-     * comunque la notifica sotto come ripiego.
+     * Solo la schermata a schermo intero, niente notifica: postarla in parallelo
+     * al fullScreenIntent (v1.1.6) creava una corsa fra le due - a volte
+     * comparivano entrambe sovrapposte, a volte solo la notifica. Un wake lock
+     * breve prima di startActivity() tiene sveglia la CPU quel tanto che basta
+     * perche' il sistema esegua subito l'avvio invece di rimandarlo mentre lo
+     * schermo e' spento (la vera causa per cui a schermo spento non compariva
+     * nulla) - da li' in poi ci pensano setShowWhenLocked/setTurnScreenOn di
+     * RingActivity ad accendere davvero lo schermo.
      */
     private fun ring(id: Long, label: String) {
-        val intent = RingActivity.ringIntent(this, id, label)
-        runCatching { startActivity(intent) }
-
-        val full = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val n = NotificationCompat.Builder(this, CH_RING)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle(label.ifBlank { "Sveglia" })
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setOngoing(true)
-            .setFullScreenIntent(full, true)
-            .setContentIntent(full)
-            .build()
-        runCatching { NotificationManagerCompat.from(this).notify(ID_RING, n) }
+        val wakeLock = getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "noalarm:ring")
+        wakeLock.acquire(10_000L)
+        runCatching { startActivity(RingActivity.ringIntent(this, id, label)) }
     }
 
     /** Rimanda al telefono, sulla connessione che ha fatto suonare questa sveglia, l'esito. */
@@ -169,10 +150,8 @@ class BridgeService : Service() {
         const val ACTION_STOP = 2
         const val ACTION_SNOOZE = 3
         const val ACTION_DISMISS = 4
-        const val ID_RING = 1
         private const val ID_STATUS = 2
         private const val CH_STATUS = "status"
-        private const val CH_RING = "ring"
 
         @Volatile private var instance: BridgeService? = null
 

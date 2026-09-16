@@ -58,12 +58,11 @@ La priorita' per classe rimane un'euristica: puo' sbagliare, e resta comunque un
 ### Strumento di Prova (v1.4.18)
 Impostazioni → sezione "Sveglia" → "Prova la connessione con l'orologio" (`WearTestSheet.kt`), stesso schema della prova Glyph: `WearBridge.status` (`StateFlow<WearStatus>`) espone permesso, dispositivi accoppiati, a chi/con che metodo si è connesso, tempo di connessione, se il messaggio è stato scritto, se e in quanto è arrivato l'ack, ultimo errore. `WearBridge.test()` manda lo stesso `ACTION_RING` id 0 della "Prova" locale sul watch; `BridgeService.handle()` ora rimanda **sempre** lo stesso `ACTION_RING` come conferma di ricezione subito dopo aver fatto suonare l'eco (per una sveglia vera il telefono lo ignora, non c'è branch per `ACTION_RING` in `listenForReply()`). Serve a distinguere "non si connette", "si connette ma non scrive", "scrive ma il watch non risponde" (es. APK watch non aggiornato) invece di scoprirlo solo quando una sveglia vera non arriva.
 
-### Notifiche a Schermo Intero sul Watch (Android 14+)
-Il watch monta `targetSdk 35`. Da Android 14 (API 34) dichiarare `USE_FULL_SCREEN_INTENT` nel manifest **non basta piu'**: senza consenso esplicito dell'utente in Impostazioni, `NotificationCompat.Builder.setFullScreenIntent()` (usato da `BridgeService.ring()`) degrada in silenzio a notifica normale — l'eco arriva come notifica invece che come `RingActivity` a tutto schermo con vibrazione e i tasti Rinvia/Spegni. **Sintomo osservato (v1.4.18)**: ack ricevuto in 107 ms (connessione BT ok), ma solo una notifica sul watch, nessuna schermata.
-**Fix v1.4.19**: `MainActivity.kt` (watch) controlla `NotificationManager.canUseFullScreenIntent()` (`>= 34`, sempre `true` sotto) a ogni `onResume()`; se `false`, mostra un avviso con pulsante che apre `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT` per questo pacchetto.
-
-**Persisteva anche a schermo spento (v1.1.5)**: col permesso concesso, l'utente ha comunque visto la notifica invece della schermata piena con lo schermo del watch spento/in ambient — la condizione in cui il fullScreenIntent dovrebbe auto-aprirsi da solo. Su questo stack Wear OS evidentemente non lo fa.
-**Fix v1.1.6**: `BridgeService.ring()` tenta anche `startActivity()` diretto su `RingActivity` PRIMA di postare la notifica (avvolto in `runCatching`: se l'OS lo blocca, resta la notifica come ripiego, nessuna regressione). Non c'e' garanzia formale che un servizio in background possa farlo (da qui il tentativo protetto invece che l'unica strada), ma vale la pena provarlo dato che il meccanismo "ufficiale" (fullScreenIntent) non si comporta come sul telefono.
+### Schermata Sveglia sul Watch: Storia Completa (fino a v1.1.7)
+1. **v1.4.18**: solo notifica, mai `RingActivity`. Causa: da Android 14 (API 34, il watch monta `targetSdk 35`) dichiarare `USE_FULL_SCREEN_INTENT` nel manifest non basta piu' — serve consenso esplicito in Impostazioni, altrimenti `setFullScreenIntent()` degrada in silenzio a notifica normale. **Fix v1.4.19**: richiesta del consenso via `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`.
+2. **v1.1.5**: persisteva anche col consenso concesso E a schermo spento/ambient — la condizione in cui il fullScreenIntent dovrebbe auto-aprirsi da solo. **Fix v1.1.6**: `BridgeService.ring()` tenta anche `startActivity()` diretto su `RingActivity`, IN PARALLELO alla notifica con fullScreenIntent (non al posto di).
+3. **v1.1.6**: la doppia strada creava una corsa fra le due UI. Riscontrato dall'utente: **a schermo acceso** l'avvio diretto vinceva sempre (schermata piena, ma con la notifica che si sovrapponeva sopra); **a schermo spento** l'avvio diretto non arrivava mai in tempo (restava solo la notifica) — il vero problema non era un blocco BAL sull'avvio diretto, ma il sistema che lo rimandava mentre la CPU era in doze con lo schermo spento.
+   - **Fix v1.1.7**: tolta la notifica dell'eco (`CH_RING`) e il fullScreenIntent — solo piu' `startActivity()` diretto, preceduto da un `PowerManager.PARTIAL_WAKE_LOCK` di 10 s che tiene sveglia la CPU quel tanto che basta perche' il sistema esegua subito l'avvio invece di rimandarlo in doze; da li' `setShowWhenLocked`/`setTurnScreenOn` di `RingActivity` (gia' presenti) accendono davvero lo schermo. Rimossi anche il permesso `USE_FULL_SCREEN_INTENT` e il relativo avviso in `MainActivity.kt`, diventati inutili.
 
 ### Vibrazione sul Watch
 **Bug risolto in v1.4.15**: `RingActivity` usava `createWaveform(..., repeat=0)` (loop infinito) senza mai chiamare `vibrator.cancel()` → continuava a vibrare anche dopo Spegni/Posticipa o stop dal telefono.
@@ -86,8 +85,8 @@ Prima usava il Material3 di default (schema colori chiaro/scuro di sistema), nes
 
 ## Versioni Attuali
 
-- **App**: v1.4.21 (versionCode 42)
-- **Watch**: v1.1.6 (versionCode 9)
+- **App**: v1.4.22 (versionCode 43)
+- **Watch**: v1.1.7 (versionCode 10)
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
 
@@ -112,11 +111,14 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
    - Prova reale (v1.4.18): per il TicWatch E3 dell'utente e' successo il contrario (canale diretto fallito, SDP riuscita) — l'ipotesi sull'ordine era sbagliata, vedi Causa 5.
 5. ✅ **Causa 5 (v1.4.19, causa reale)**: con molti dispositivi Bluetooth accoppiati (nel caso reale: 14 — mouse, TV, pompa insulina, auto, cuffie...), `connect()` li provava tutti in sequenza, ciascuno con canale diretto e SDP uno dopo l'altro, prima di arrivare al watch: 64 secondi misurati prima di raggiungere il TicWatch (7° nella lista).
    - **Fix**: dispositivi di classe `WEARABLE_WRIST_WATCH` provati per primi; per ciascun dispositivo canale diretto e SDP in parallelo (`ExecutorCompletionService`, timeout 4 s) invece che in sequenza.
-6. **Causa 6 (v1.4.19, fix parziale)**: ack ricevuto (connessione BT funzionante), ma sul watch appariva solo una notifica invece della schermata `RingActivity` — vedi "Notifiche a Schermo Intero sul Watch (Android 14+)" sopra.
+6. **Causa 6 (v1.4.19, fix parziale)**: ack ricevuto (connessione BT funzionante), ma sul watch appariva solo una notifica invece della schermata `RingActivity` — vedi "Schermata Sveglia sul Watch: Storia Completa" sopra.
    - **Fix**: `MainActivity.kt` (watch) chiede il consenso `USE_FULL_SCREEN_INTENT` in Impostazioni quando manca.
    - Non bastava: persisteva anche a schermo spento/ambient col permesso concesso, condizione in cui il fullScreenIntent dovrebbe auto-aprirsi da solo. Vedi Causa 7.
-7. ✅ **Causa 7 (v1.1.6)**: su questo stack Wear OS il fullScreenIntent non auto-apre `RingActivity` nemmeno a schermo spento, a differenza del telefono.
-   - **Fix**: `BridgeService.ring()` tenta anche `startActivity()` diretto (protetto da `runCatching`), oltre alla notifica con fullScreenIntent che resta come ripiego.
+7. **Causa 7 (v1.1.6, fix parziale)**: su questo stack Wear OS il fullScreenIntent non auto-apre `RingActivity` a schermo spento, a differenza del telefono.
+   - **Fix**: `BridgeService.ring()` tenta anche `startActivity()` diretto, IN PARALLELO alla notifica con fullScreenIntent.
+   - Non bastava: le due strade correvano fra loro — a schermo acceso entrambe comparivano sovrapposte, a schermo spento vinceva quasi sempre solo la notifica. Vedi Causa 8.
+8. ✅ **Causa 8 (v1.1.7, causa reale)**: la notifica e l'avvio diretto pubblicati insieme creavano la corsa; a schermo spento l'avvio diretto veniva rimandato dal sistema mentre la CPU era in doze, non bloccato.
+   - **Fix**: tolta del tutto la notifica dell'eco. Solo `startActivity()` diretto, preceduto da un `PowerManager.PARTIAL_WAKE_LOCK` di 10 s che tiene sveglia la CPU perche' il sistema lo esegua subito invece di rimandarlo.
 
 ### Lint Failure `wear:lintVitalRelease`
 ✅ **Risolto in v1.4.13**: `play-services-wearable` tirava transitive fragment old, aggiunto `libs.androidx.fragment.ktx`. Poi rimosso tutto `play-services-wearable` quando passato a RFCOMM.
@@ -157,4 +159,4 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 
 ---
 
-**Ultima revisione**: v1.4.21/1.1.6 (15 Sep 2026) — stile Nothing sul watch (Theme.kt, Widgets.kt), BridgeService tenta anche l'avvio diretto di RingActivity oltre al fullScreenIntent (non auto-apriva nemmeno a schermo spento). App non toccata in questo giro, versione avanzata solo per continuita' del tag di release.
+**Ultima revisione**: v1.4.22/1.1.7 (16 Sep 2026) — tolta la notifica dell'eco (creava una corsa con la schermata a tutto schermo), solo startActivity() diretto con wake lock breve. App non toccata in questo giro, versione avanzata solo per continuita' del tag di release.

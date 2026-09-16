@@ -23,7 +23,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.core.app.NotificationManagerCompat
 
 /** Eco della sveglia sul watch: vibra e mostra spegni/posticipa, che rimandano l'esito al telefono. */
 class RingActivity : ComponentActivity() {
@@ -94,7 +93,6 @@ class RingActivity : ComponentActivity() {
     }
 
     private fun respond(action: Int) {
-        NotificationManagerCompat.from(this).cancel(BridgeService.ID_RING)
         if (id == 0L) return // "Prova" dalla schermata principale: nessun telefono da avvisare.
         BridgeService.respond(action)
     }

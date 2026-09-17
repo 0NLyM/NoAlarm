@@ -65,14 +65,24 @@ object NotificationHelper {
     )
 
     /**
-     * Notifica a schermo intero mostrata mentre la sveglia suona. Wear OS la
-     * mostra anche sull'orologio abbinato via bridging automatico di sistema
-     * (nessun codice/dipendenza aggiuntiva) a meno che [Alarm.ringOnWatch] sia
+     * Notifica mostrata mentre la sveglia suona. Wear OS la mostra anche
+     * sull'orologio abbinato via bridging automatico di sistema (nessun
+     * codice/dipendenza aggiuntiva) a meno che [Alarm.ringOnWatch] sia
      * disattivato, nel qual caso [NotificationCompat.Builder.setLocalOnly]
      * la esclude dal bridging.
+     *
+     * Niente [NotificationCompat.Builder.setFullScreenIntent]: il bridging
+     * di Wear OS lo ignora e non lo supporta sul watch, quindi va tenuto
+     * fuori dal builder condiviso — l'apertura a schermo intero sul
+     * telefono e' garantita da [AlarmReceiver] con uno startActivity()
+     * diretto (esente dai limiti BAL perche' innescato da AlarmManager),
+     * non piu' da questa notifica. Niente [NotificationCompat.Builder.setOngoing]
+     * per lo stesso motivo (le notifiche ongoing non vengono bridgeate) —
+     * non serve comunque: essendo legata a un foreground service, il
+     * sistema non la rende sganciabile con uno swipe.
      */
     fun ringing(c: Context, alarm: Alarm): Notification {
-        val full = PendingIntent.getActivity(
+        val open = PendingIntent.getActivity(
             c, alarm.id.hashCode(),
             Intent(c, AlarmActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -87,10 +97,8 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOngoing(true)
             .setAutoCancel(false)
-            .setFullScreenIntent(full, true)
-            .setContentIntent(full)
+            .setContentIntent(open)
             .addAction(0, "POSTICIPA", action(c, ActionReceiver.SNOOZE, alarm.id))
             .addAction(0, "SPEGNI", action(c, ActionReceiver.DISMISS, alarm.id))
             .setLocalOnly(!alarm.ringOnWatch)

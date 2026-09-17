@@ -89,7 +89,9 @@ fun SettingsScreen() {
             title = "Prova la sveglia adesso",
             subtitle = "Fa suonare una sveglia vera per controllare notifica, eco sul watch e Posticipa/Spegni",
             onClick = {
-                Store.putAlarm(Alarm(id = AlarmScheduler.TEST_ID, label = "Prova"))
+                // Volume pieno da subito: con l'aumento graduale (default) si parte
+                // al 5% e ci vogliono ~45s per sentirla, sembra "silenziata".
+                Store.putAlarm(Alarm(id = AlarmScheduler.TEST_ID, label = "Prova", gradualVolume = false))
                 AlarmService.ring(context, AlarmScheduler.TEST_ID)
             },
         )

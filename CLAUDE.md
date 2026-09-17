@@ -47,6 +47,7 @@ Nessun boilerplate, no astrazioni gratuite, no commenti che spiegano l'ovvio. Sc
 - **Strumento di prova (v1.4.27, v1.4.29 senza audio/vibrazione)**: Impostazioni → sezione "Sveglia" → "Prova la sveglia adesso" fa suonare per davvero una sveglia sintetica (`AlarmScheduler.TEST_ID = -3L`, esclusa dall'elenco sveglie con `it.id >= 0` in `AlarmScreen.kt`) chiamando `AlarmService.ring()` direttamente — stessa notifica, stesso bridging, stesso `Posticipa`/`Spegni` di una sveglia vera, ma senza aspettare l'orario giusto. Utile per iterare rapidamente sul debug del bridging: se non compare sul watch nemmeno con questo, il problema e' nel bridging/permesso, non nello scheduling.
   - **v1.4.28 (annullato in v1.4.29)**: si era corretto `gradualVolume = true` (partiva al 5%, sembrava "silenziata" su un test rapido) mettendolo a `false`. Richiesta successiva: niente audio ne' vibrazione affatto durante il test, per non farla suonare ad ogni iterazione di debug.
   - **v1.4.29**: `Alarm(id = TEST_ID, label = "Prova", soundUri = Alarm.SOUND_NONE, vibrate = false)` — solo notifica/bridging/Glyph, sveglia muta e senza vibrazione. Il tema del volume del v1.4.28 non si pone piu': non c'e' suono da regolare.
+  - **v1.4.32 — diagnostica**: dato che le cause note nel codice della notifica sono esaurite (v1.4.30/v1.4.31), il tasto raccoglie anche una diagnosi mostrata sotto il bottone (`collectWearDiagnostics()` in `SettingsScreen.kt`, nessun permesso nuovo): notifiche di sistema attive, importanza del canale `CH_ALARM` (deve restare 4/alta — se l'utente o l'OEM l'ha abbassata manualmente da Impostazioni → Notifiche, il bridging puo' escluderla), stato del Bluetooth, ed **`NotificationManagerCompat.getEnabledListenerPackages()`** — l'elenco delle app con "Accesso alle notifiche" concesso dall'utente. Quest'ultimo e' il dato piu' utile: se Mobvoi Health (o l'app che gestisce il TicWatch) non compare in quell'elenco, il suo `NotificationListenerService` non specchia nulla di nessuna app, non solo di NoAlarm — confermerebbe l'ipotesi "permesso mancante" senza dover indovinare il nome del package (nessun `<queries>` nel manifest, nessuna nuova dipendenza).
 
 ### (Storico, superato in v1.4.26 — vedi sopra) Bluetooth Echo via RFCOMM Classico
 **Problema**: Google's Wearable Data Layer API richiede watch abbinato via "Wear OS by Google" companion app. Con pairing di terze parti (Mobvoi Health su Ticwatch) il watch non è mai registrato come "nodo" → `connectedNodes` vuoto → messaggi non arrivano mai.
@@ -117,7 +118,7 @@ Prima usava il Material3 di default (schema colori chiaro/scuro di sistema), nes
 
 ## Versioni Attuali
 
-- **App**: v1.4.31 (versionCode 52)
+- **App**: v1.4.32 (versionCode 53)
 - **Watch**: v1.2.0 (versionCode 13) — non piu' toccata da v1.4.26, il modulo `:wear` e' orfano (vedi "Eco sul Watch via Notification Bridging di Sistema").
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
@@ -200,4 +201,4 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 
 ---
 
-**Ultima revisione**: v1.4.31 (17 Sep 2026) — annullato il tentativo di v1.4.30 (rimuovere `setOngoing`/`setFullScreenIntent`): sul telefono ha rotto l'apertura a schermo intero a schermo spento e cambiato l'aspetto dei pulsanti della notifica, **senza risolvere il bridging sul watch** (ancora niente). Ripristinato lo stato precedente. Nessuna causa nota resta da testare nel codice della notifica: il prossimo passo e' verificare il permesso "Accesso alle notifiche" per Mobvoi Health, o valutare il ritorno al bridge Bluetooth custom (v1.4.25/v1.2.0) — vedi "Eco sul Watch via Notification Bridging di Sistema".
+**Ultima revisione**: v1.4.32 (17 Sep 2026) — deciso di proseguire senza tornare al bridge Bluetooth. Dato che le cause note nel codice della notifica sono esaurite (v1.4.30/v1.4.31, entrambe senza effetto sul bridging), "Prova la sveglia adesso" adesso raccoglie anche una diagnosi (notifiche attive, importanza canale, Bluetooth, e soprattutto le app con "Accesso alle notifiche" concesso) per verificare l'ipotesi del permesso mancante a Mobvoi Health senza dover indovinare nulla — vedi "Eco sul Watch via Notification Bridging di Sistema".

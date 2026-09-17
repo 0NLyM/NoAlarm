@@ -65,24 +65,22 @@ object NotificationHelper {
     )
 
     /**
-     * Notifica mostrata mentre la sveglia suona. Wear OS la mostra anche
-     * sull'orologio abbinato via bridging automatico di sistema (nessun
-     * codice/dipendenza aggiuntiva) a meno che [Alarm.ringOnWatch] sia
+     * Notifica a schermo intero mostrata mentre la sveglia suona. Wear OS la
+     * mostra anche sull'orologio abbinato via bridging automatico di sistema
+     * (nessun codice/dipendenza aggiuntiva) a meno che [Alarm.ringOnWatch] sia
      * disattivato, nel qual caso [NotificationCompat.Builder.setLocalOnly]
      * la esclude dal bridging.
      *
-     * Niente [NotificationCompat.Builder.setFullScreenIntent]: il bridging
-     * di Wear OS lo ignora e non lo supporta sul watch, quindi va tenuto
-     * fuori dal builder condiviso — l'apertura a schermo intero sul
-     * telefono e' garantita da [AlarmReceiver] con uno startActivity()
-     * diretto (esente dai limiti BAL perche' innescato da AlarmManager),
-     * non piu' da questa notifica. Niente [NotificationCompat.Builder.setOngoing]
-     * per lo stesso motivo (le notifiche ongoing non vengono bridgeate) —
-     * non serve comunque: essendo legata a un foreground service, il
-     * sistema non la rende sganciabile con uno swipe.
+     * `setOngoing`/`setFullScreenIntent` erano stati tolti in v1.4.30 nel
+     * tentativo di far bridgeare la notifica sul watch (si escludono dal
+     * mirroring di sistema): rimessi in v1.4.31, perche' su questo hardware
+     * l'apertura a schermo intero del telefono a schermo spento dipendeva
+     * solo da `setFullScreenIntent` — un `startActivity()` diretto da
+     * `AlarmReceiver` non bastava a riprodurla — e il watch continuava
+     * comunque a non ricevere nulla: nessun guadagno, una regressione reale.
      */
     fun ringing(c: Context, alarm: Alarm): Notification {
-        val open = PendingIntent.getActivity(
+        val full = PendingIntent.getActivity(
             c, alarm.id.hashCode(),
             Intent(c, AlarmActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -97,8 +95,10 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
             .setAutoCancel(false)
-            .setContentIntent(open)
+            .setFullScreenIntent(full, true)
+            .setContentIntent(full)
             .addAction(0, "POSTICIPA", action(c, ActionReceiver.SNOOZE, alarm.id))
             .addAction(0, "SPEGNI", action(c, ActionReceiver.DISMISS, alarm.id))
             .setLocalOnly(!alarm.ringOnWatch)

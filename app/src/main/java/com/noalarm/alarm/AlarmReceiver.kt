@@ -26,15 +26,6 @@ class AlarmReceiver : BroadcastReceiver() {
                 if (alarm.skipNext) Store.updateAlarm(id) { it.copy(skipNext = false) }
                 NotificationHelper.cancelSnoozed(context, id)
                 AlarmService.ring(context, id, fresh = alarm.snoozedUntil == 0L)
-                // La notifica non ha piu' un fullScreenIntent (Wear OS non lo bridgea):
-                // l'apertura a schermo intero sul telefono passa da qui, un
-                // BroadcastReceiver innescato dall'AlarmManager e' esente dai
-                // limiti di avvio in background e puo' avviare l'Activity diretta.
-                context.startActivity(
-                    Intent(context, AlarmActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                        .putExtra(AlarmScheduler.EXTRA_ID, id)
-                )
             }
         }
     }

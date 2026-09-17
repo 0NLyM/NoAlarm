@@ -83,10 +83,10 @@ import java.time.LocalTime
 @Composable
 fun AlarmScreen() {
     val context = LocalContext.current
-    // Esclude la sveglia sintetica della routine del sonno: si modifica dal
-    // foglio Riposo, non come una sveglia qualunque in questo elenco.
+    // Esclude le sveglie sintetiche (routine del sonno, prova dalle Impostazioni):
+    // non sono sveglie vere da mostrare/modificare in questo elenco.
     val alarms by Store.alarms.collectAsStateWithLifecycle()
-    val userAlarms = alarms.filter { it.id != AlarmScheduler.BEDTIME_WAKE_ID }
+    val userAlarms = alarms.filter { it.id >= 0 }
     val settings by Store.settings.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Alarm?>(null) }
     var bedtime by remember { mutableStateOf(false) }

@@ -22,6 +22,8 @@ object AlarmScheduler {
     private const val BEDTIME_ID = -1L
     /** Sveglia vera gestita dalla routine del sonno, all'orario di "Sveglia". */
     const val BEDTIME_WAKE_ID = -2L
+    /** Sveglia sintetica per "Prova la sveglia adesso" nelle Impostazioni. */
+    const val TEST_ID = -3L
 
     private fun manager(c: Context) = c.getSystemService(AlarmManager::class.java)
 

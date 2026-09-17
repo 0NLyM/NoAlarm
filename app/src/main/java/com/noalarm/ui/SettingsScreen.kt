@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.noalarm.BuildConfig
 import com.noalarm.alarm.AlarmScheduler
+import com.noalarm.alarm.AlarmService
+import com.noalarm.data.Alarm
 import com.noalarm.data.AppFont
 import com.noalarm.data.BarAppearance
 import com.noalarm.data.KeyAction
@@ -82,6 +84,14 @@ fun SettingsScreen() {
             Modifier.padding(horizontal = 4.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        RowItem(
+            title = "Prova la sveglia adesso",
+            subtitle = "Fa suonare una sveglia vera per controllare notifica, eco sul watch e Posticipa/Spegni",
+            onClick = {
+                Store.putAlarm(Alarm(id = AlarmScheduler.TEST_ID, label = "Prova"))
+                AlarmService.ring(context, AlarmScheduler.TEST_ID)
+            },
         )
 
         SectionLabel("Comandi mentre suona")

@@ -67,10 +67,13 @@ class AlarmService : Service() {
         if (intent?.getBooleanExtra(EXTRA_FRESH, true) != false) snoozeCount.value = 0
         ServiceCompat.startForeground(
             this,
-            NotificationHelper.ID_RINGING,
-            NotificationHelper.ringing(this, alarm),
+            NotificationHelper.ID_RINGING_FGS,
+            NotificationHelper.foregroundPlaceholder(this, alarm),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
         )
+        runCatching {
+            NotificationManagerCompat.from(this).notify(NotificationHelper.ID_RINGING, NotificationHelper.ringing(this, alarm))
+        }
 
         wakeLock = getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "noalarm:ring")

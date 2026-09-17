@@ -28,6 +28,7 @@ object NotificationHelper {
     const val ID_SNOOZED = 1005
     const val ID_MISSED = 1006
     const val ID_STOPWATCH = 1007
+    const val ID_RINGING_FGS = 1008
 
     fun createChannels(c: Context) {
         val nm = c.getSystemService(NotificationManager::class.java)
@@ -64,30 +65,26 @@ object NotificationHelper {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
+    private fun fullScreenIntent(c: Context, alarm: Alarm): PendingIntent = PendingIntent.getActivity(
+        c, alarm.id.hashCode(),
+        Intent(c, AlarmActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            .putExtra(AlarmScheduler.EXTRA_ID, alarm.id),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
     /**
-     * Notifica a schermo intero mostrata mentre la sveglia suona. Wear OS la
-     * mostra anche sull'orologio abbinato via bridging automatico di sistema
-     * (nessun codice/dipendenza aggiuntiva) a meno che [Alarm.ringOnWatch] sia
-     * disattivato, nel qual caso [NotificationCompat.Builder.setLocalOnly]
-     * la esclude dal bridging.
-     *
-     * v1.4.30 aveva tolto sia `setOngoing` che `setFullScreenIntent` insieme:
-     * ha rotto lo schermo intero sul telefono senza risolvere il watch, ma
-     * confondeva due variabili nello stesso test. v1.4.31 le aveva rimesse
-     * entrambe. v1.4.33: con l'eco confermato funzionante per altre app sullo
-     * stesso watch (quindi non e' un problema di permesso/connessione), si
-     * isola `setOngoing` da solo — resta `setFullScreenIntent`, quindi lo
-     * schermo intero sul telefono a schermo spento non e' a rischio: e' l'unica
-     * cosa che l'ultimo test non aveva provato in isolamento.
+     * Notifica bridgeabile su Wear OS mostrata mentre la sveglia suona.
+     * Deve restare del tutto slegata dal foreground service: Android esclude
+     * le notifiche "media playback" dal rendere lo swipe possibile (eccezione
+     * alla dismissibilita' introdotta in Android 14) e Wear OS non bridgea
+     * mai una notifica ongoing — nessun flag messo qui sull'oggetto risolve
+     * il bridging se e' comunque quello passato a startForeground(). Per
+     * questo [AlarmService] la posta separatamente da [foregroundPlaceholder]
+     * con [ID_RINGING] invece che con l'id del foreground service.
      */
     fun ringing(c: Context, alarm: Alarm): Notification {
-        val full = PendingIntent.getActivity(
-            c, alarm.id.hashCode(),
-            Intent(c, AlarmActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                .putExtra(AlarmScheduler.EXTRA_ID, alarm.id),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+        val full = fullScreenIntent(c, alarm)
         val s = Store.settings.value
         return NotificationCompat.Builder(c, CH_ALARM)
             .setSmallIcon(R.drawable.ic_stat_alarm)
@@ -97,11 +94,31 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(false)
-            .setFullScreenIntent(full, true)
             .setContentIntent(full)
             .addAction(0, "POSTICIPA", action(c, ActionReceiver.SNOOZE, alarm.id))
             .addAction(0, "SPEGNI", action(c, ActionReceiver.DISMISS, alarm.id))
             .setLocalOnly(!alarm.ringOnWatch)
+            .build()
+    }
+
+    /**
+     * Notifica minima usata solo per soddisfare startForeground(..., MEDIA_PLAYBACK):
+     * e' lei che porta lo schermo intero sul telefono anche a schermo spento
+     * (serve il fullScreenIntent su *qualche* notifica visibile subito), ma
+     * resta sempre [NotificationCompat.Builder.setLocalOnly] per non offrire
+     * a Wear OS una seconda copia, ongoing e quindi mai bridgeata comunque,
+     * della sveglia.
+     */
+    fun foregroundPlaceholder(c: Context, alarm: Alarm): Notification {
+        val full = fullScreenIntent(c, alarm)
+        return NotificationCompat.Builder(c, CH_ALARM)
+            .setSmallIcon(R.drawable.ic_stat_alarm)
+            .setContentTitle(alarm.label.ifBlank { "Sveglia" })
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setFullScreenIntent(full, true)
+            .setContentIntent(full)
+            .setLocalOnly(true)
             .build()
     }
 

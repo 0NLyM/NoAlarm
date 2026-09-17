@@ -71,13 +71,14 @@ object NotificationHelper {
      * disattivato, nel qual caso [NotificationCompat.Builder.setLocalOnly]
      * la esclude dal bridging.
      *
-     * `setOngoing`/`setFullScreenIntent` erano stati tolti in v1.4.30 nel
-     * tentativo di far bridgeare la notifica sul watch (si escludono dal
-     * mirroring di sistema): rimessi in v1.4.31, perche' su questo hardware
-     * l'apertura a schermo intero del telefono a schermo spento dipendeva
-     * solo da `setFullScreenIntent` — un `startActivity()` diretto da
-     * `AlarmReceiver` non bastava a riprodurla — e il watch continuava
-     * comunque a non ricevere nulla: nessun guadagno, una regressione reale.
+     * v1.4.30 aveva tolto sia `setOngoing` che `setFullScreenIntent` insieme:
+     * ha rotto lo schermo intero sul telefono senza risolvere il watch, ma
+     * confondeva due variabili nello stesso test. v1.4.31 le aveva rimesse
+     * entrambe. v1.4.33: con l'eco confermato funzionante per altre app sullo
+     * stesso watch (quindi non e' un problema di permesso/connessione), si
+     * isola `setOngoing` da solo — resta `setFullScreenIntent`, quindi lo
+     * schermo intero sul telefono a schermo spento non e' a rischio: e' l'unica
+     * cosa che l'ultimo test non aveva provato in isolamento.
      */
     fun ringing(c: Context, alarm: Alarm): Notification {
         val full = PendingIntent.getActivity(
@@ -95,7 +96,6 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOngoing(true)
             .setAutoCancel(false)
             .setFullScreenIntent(full, true)
             .setContentIntent(full)

@@ -23,6 +23,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.google.android.gms.wearable.Wearable
+import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
 
 /** Eco della sveglia sul watch: vibra e mostra spegni/posticipa, che rimandano l'esito al telefono. */
 class RingActivity : ComponentActivity() {
@@ -53,11 +56,11 @@ class RingActivity : ComponentActivity() {
                             color = MaterialTheme.colorScheme.onBackground,
                         )
                         Spacer(Modifier.height(24.dp))
-                        PillButton("Posticipa", onClick = { respond(BridgeService.ACTION_SNOOZE); finish() })
+                        PillButton("Posticipa", onClick = { respond(RingListenerService.PATH_SNOOZE); finish() })
                         Spacer(Modifier.height(12.dp))
                         PillButton(
                             "Spegni",
-                            onClick = { respond(BridgeService.ACTION_DISMISS); finish() },
+                            onClick = { respond(RingListenerService.PATH_DISMISS); finish() },
                             color = MaterialTheme.colorScheme.secondary,
                             contentColor = MaterialTheme.colorScheme.onSecondary,
                         )
@@ -92,9 +95,15 @@ class RingActivity : ComponentActivity() {
         v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400, 1000), 0))
     }
 
-    private fun respond(action: Int) {
+    private fun respond(path: String) {
         if (id == 0L) return // "Prova" dalla schermata principale: nessun telefono da avvisare.
-        BridgeService.respond(action)
+        val out = ByteArrayOutputStream()
+        DataOutputStream(out).use { it.writeLong(id) }
+        val payload = out.toByteArray()
+        val messages = Wearable.getMessageClient(this)
+        Wearable.getNodeClient(this).connectedNodes.addOnSuccessListener { nodes ->
+            nodes.forEach { node -> messages.sendMessage(node.id, path, payload) }
+        }
     }
 
     override fun onDestroy() {

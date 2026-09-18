@@ -31,9 +31,19 @@ Nessun boilerplate, no astrazioni gratuite, no commenti che spiegano l'ovvio. Sc
 
 ### Moduli
 - `:app` — app phone (Kotlin/Jetpack Compose, API 33+)
-- `:wear` — app watch (Kotlin/Jetpack Compose, API 30+, Wear OS 3+) — **non piu' usato dal telefono da v1.4.26, vedi sotto**: i file restano nel repo ma nessun codice in `:app` li contatta piu'.
+- `:wear` — app watch (Kotlin/Jetpack Compose, API 30+, Wear OS 3+) — **di nuovo contattata dal telefono da v1.4.35** (Data Layer API, vedi sotto), dopo essere stata orfana da v1.4.26 a v1.4.34.
 
-### Eco sul Watch via Notification Bridging di Sistema (v1.4.26 — sostituisce tutto il bridge Bluetooth custom sotto)
+### Eco sul Watch via Data Layer API (v1.4.35 — ripristina il meccanismo del commit 3c7fb98, in parallelo al notification bridging sotto)
+**Perche' si torna qui**: dopo 12 cause diverse esplorate e corrette sul notification bridging (v1.4.26-v1.4.34, vedi sezione sotto) senza che la notifica sia mai arrivata sul TicWatch E3 dell'utente — nemmeno dopo aver eliminato l'ultima causa nota per cui restava "ongoing" (Causa 12, architetturale: era l'argomento di `startForeground(..., MEDIA_PLAYBACK)`) — si ripristina il meccanismo del tutto diverso del primo tentativo mai fatto (commit `3c7fb98`, 5 Set 2026), mai davvero verificato su questo hardware: **Wearable Data Layer API** (`com.google.android.gms.wearable`, `play-services-wearable`), non un bridging automatico di notifiche ma un messaggio esplicito phone→watch e ritorno via `MessageClient`/nodi abbinati.
+
+- **Phone → watch**: `AlarmService.onStartCommand()` chiama `WearBridge.ringOnWatches(this, alarm)` (gated da `alarm.ringOnWatch`, come il notification bridging) subito dopo aver avviato Glyph/vibrazione; `finish()` chiama `WearBridge.stopOnWatches(this)` incondizionatamente. `WearBridge.kt` (`app/src/main/java/com/noalarm/wear/`) manda un messaggio (`PATH_RING`/`PATH_STOP`, id+etichetta come payload binario) a ogni nodo Wearable connesso (`Wearable.getNodeClient(context).connectedNodes`) — se la lista e' vuota (watch non registrato come "nodo", vedi rischio sotto) non succede nulla, in silenzio: resta solo un'eco aggiuntiva, mai la fonte di verita' della sveglia.
+- **Watch → phone**: `RingListenerService.kt` (`:wear`, `WearableListenerService`, dichiarato in manifest con l'intent-filter `MESSAGE_RECEIVED`) riceve `PATH_RING` e apre `RingActivity` (la stessa schermata gia' rifinita in stile Nothing, con `PillButton`/vibrazione-poi-cancel esistenti — solo il trasporto e' cambiato), o `PATH_STOP` per chiuderla se il telefono smette di suonare per un'altra via. Le due azioni di `RingActivity` (Posticipa/Spegni) mandano `PATH_SNOOZE`/`PATH_DISMISS` allo stesso modo, direttamente via `Wearable.getMessageClient`, senza passare da un service intermedio sul watch. Sul telefono, `PhoneWearService.kt` (`WearableListenerService`, manifest `:app`) le riceve e chiama `AlarmService.dismiss()`/`snooze()` — le stesse funzioni usate da notifica, tasto power e gesti: nessuna logica di sveglia duplicata.
+- **Nessuna programmazione locale sul watch**: a differenza dell'era RFCOMM (v1.2.0-v1.4.25, storico sotto), il watch non programma piu' nulla da solo via `AlarmManager` — e' di nuovo un'eco pura, "prima iterazione volutamente semplice" come nel commit originale. Per questo `WatchAlarmScheduler.kt`/`WatchAlarmReceiver.kt`/`BootReceiver.kt`/`BridgeService.kt` (RFCOMM, wake lock permanente, sync schedule) sono stati rimossi per intero insieme al passaggio: erano gia' orfani da v1.4.26, e sotto Data Layer non servono ne' loro ne' un foreground service sul watch — `RingListenerService` e' invocato dal sistema on-demand, nessun socket/servizio sempre attivo da tenere sveglio, quindi anche i permessi Bluetooth/foreground-service/boot/esenzione-batteria nel manifest watch sono spariti insieme ai file che li usavano.
+- **Rischio noto, da verificare per davvero stavolta**: la ragione per cui si era abbandonata la Data Layer API in favore di RFCOMM (vedi "Bluetooth Echo via RFCOMM Classico" sotto) era che il pairing di terze parti (Mobvoi Health) non registra il watch come "nodo" Wearable — ma quella conclusione non risulta mai confermata da un test reale del commit 3c7fb98 su questo TicWatch E3: si era passati a RFCOMM per ragionamento a priori, non per una prova fallita in pratica. **Da verificare sul serio con "Prova la sveglia adesso".**
+- **Doppio meccanismo attivo in parallelo**: il notification bridging (v1.4.34, sotto) resta com'era — `NotificationHelper.ringing()` continua a essere postata con `setLocalOnly(!alarm.ringOnWatch)` indipendentemente dalla Data Layer. Se `connectedNodes` risulta vuoto come temuto, il notification bridging resta l'unico altro tentativo attivo; se invece la Data Layer funziona per davvero su questo hardware, i due sono ridondanti ma non in conflitto (il watch riceverebbe sia il messaggio via `RingListenerService` sia, se il bridging funzionasse, anche la notifica bridgeata).
+- **Non ancora verificato su TicWatch E3** — prossimo test reale con "Prova la sveglia adesso".
+
+### Eco sul Watch via Notification Bridging di Sistema (v1.4.26 — sostituisce tutto il bridge Bluetooth custom sotto; resta attivo in parallelo alla Data Layer API sopra, mai confermato funzionante su questo hardware)
 **Problema con la v1.2.0/1.4.25 (Bluetooth RFCOMM custom + sync via AlarmManager)**: funzionava, ma per farlo serviva un intero secondo modulo app (`:wear`), un protocollo binario duplicato su due file, un server RFCOMM sempre in ascolto sul watch e un canale di sync che poteva perdere colpi se il processo del watch era congelato nell'istante sbagliato — tanta superficie per un problema che Android risolve gia' da solo a un livello piu' basso.
 
 **Soluzione**: la notifica della sveglia che il telefono mostra gia' (`NotificationHelper.ringing()` — `CATEGORY_ALARM`, `PRIORITY_MAX`, `ongoing`, azioni "Posticipa"/"Spegni" con `PendingIntent.getBroadcast`) viene bridgeata automaticamente sul watch da Wear OS stesso, via il Bluetooth di sistema, **senza alcun codice o dipendenza aggiuntiva**: e' lo stesso meccanismo che mostra sul watch le notifiche di qualunque altra app. Toccare "Posticipa"/"Spegni" sul watch fa eseguire lo stesso `PendingIntent` sul telefono — e' il sistema stesso a fare da staffetta, non serve una connessione BT gestita a mano.
@@ -176,7 +186,7 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 
 ## Data Model
 
-- `Alarm.ringOnWatch: Boolean` (default true) → sveglia suona anche sul watch; da v1.4.26 controlla `WearableExtender().setLocalOnly(!ringOnWatch)` sulla notifica invece del vecchio bridge Bluetooth
+- `Alarm.ringOnWatch: Boolean` (default true) → sveglia suona anche sul watch; gate sia di `WearBridge.ringOnWatches()` (Data Layer API, v1.4.35) sia di `setLocalOnly(!ringOnWatch)` sulla notifica bridgeabile (v1.4.26+)
 - `Settings.defaultRingOnWatch` → preferenza per nuove sveglie
 - UI: switch in `AlarmScreen` riga 647, chip selector per gruppi esistenti
 
@@ -196,15 +206,14 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
 |------|-------|
 | `app/build.gradle.kts` | Versioning app, dipendenze phone |
 | `app/src/main/java/com/noalarm/alarm/NotificationHelper.kt` | Costruisce le notifiche sveglia; da v1.4.34 sono due oggetti separati — `ringing()` (bridgeabile, mai ongoing) e `foregroundPlaceholder()` (lega il foreground service, sempre `setLocalOnly(true)`) — vedi "Causa 12" |
-| `app/src/main/java/com/noalarm/alarm/AlarmScheduler.kt` | Scheduling phone (nessun bridge Bluetooth da v1.4.26) |
-| `app/src/main/java/com/noalarm/alarm/AlarmService.kt` | Ring logic phone (nessun bridge Bluetooth da v1.4.26) |
-| `wear/build.gradle.kts` | Versioning watch — modulo orfano da v1.4.26, non piu' contattato dal telefono |
-| `wear/src/main/java/com/noalarm/watch/BridgeService.kt` | RFCOMM server (watch) — orfano da v1.4.26 |
-| `wear/src/main/java/com/noalarm/watch/WatchAlarmScheduler.kt` | Programma sveglie locali via `AlarmManager` — orfano da v1.4.26 |
-| `wear/src/main/java/com/noalarm/watch/WatchAlarmReceiver.kt` | Apre `RingActivity` da `AlarmManager` — orfano da v1.4.26 |
-| `wear/src/main/java/com/noalarm/watch/RingActivity.kt` | UI ring, vibrazione watch — orfano da v1.4.26 |
-| `wear/src/main/java/com/noalarm/watch/BootReceiver.kt` | Restart BridgeService su boot — orfano da v1.4.26, ma continua a girare se l'app watch resta installata |
-| `wear/src/main/AndroidManifest.xml` | Permessi, FGS type, meta-data standalone |
+| `app/src/main/java/com/noalarm/alarm/AlarmScheduler.kt` | Scheduling phone |
+| `app/src/main/java/com/noalarm/alarm/AlarmService.kt` | Ring logic phone; da v1.4.35 chiama anche `WearBridge.ringOnWatches()`/`stopOnWatches()` |
+| `app/src/main/java/com/noalarm/wear/WearBridge.kt` | Manda l'eco al watch via Data Layer API (`Wearable.MessageClient`) — v1.4.35, vedi "Eco sul Watch via Data Layer API" |
+| `app/src/main/java/com/noalarm/wear/PhoneWearService.kt` | Riceve spegni/posticipa dal watch (`WearableListenerService`) — v1.4.35 |
+| `wear/build.gradle.kts` | Versioning watch — di nuovo contattato dal telefono da v1.4.35 |
+| `wear/src/main/java/com/noalarm/watch/RingListenerService.kt` | Riceve l'ordine di suonare/smettere dal telefono via Data Layer API — v1.4.35 |
+| `wear/src/main/java/com/noalarm/watch/RingActivity.kt` | UI ring, vibrazione watch; risponde al telefono via `Wearable.MessageClient` |
+| `wear/src/main/AndroidManifest.xml` | Permessi minimi (`VIBRATE`), meta-data standalone, `RingListenerService` |
 | `wear/src/main/java/com/noalarm/watch/Theme.kt` | Palette Nothing (duplicata dal telefono) per il watch |
 | `wear/src/main/java/com/noalarm/watch/Widgets.kt` | `PillButton`, equivalente watch di `DotPillButton` |
 

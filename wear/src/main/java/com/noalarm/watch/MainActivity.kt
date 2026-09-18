@@ -1,16 +1,8 @@
 package com.noalarm.watch
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -23,39 +15,11 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 
-/** Schermata minima: conferma che l'app e' installata e in ascolto, con un test manuale. */
+/** Schermata minima: conferma che l'app e' installata, con un test manuale. */
 class MainActivity : ComponentActivity() {
-    private val requestNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    private val requestBluetooth = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-        BridgeService.start(this)
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Senza il permesso l'eco (vedi BridgeService) non puo' notificare
-        // affatto: va chiesto subito, niente altro nell'app lo fa comparire prima.
-        if (Build.VERSION.SDK_INT >= 33) requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-        // Sotto la 31 il Bluetooth e' un permesso normale, gia' concesso
-        // all'installazione: BridgeService puo' partire subito.
-        if (Build.VERSION.SDK_INT < 31 ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
-            BridgeService.start(this)
-        } else {
-            requestBluetooth.launch(Manifest.permission.BLUETOOTH_CONNECT)
-        }
-        // Senza l'esenzione, il sistema (o il battery manager del produttore)
-        // puo' chiudere BridgeService dopo un po' a schermo spento, interrompendo
-        // l'eco finche' non si riapre l'app: chiesta una sola volta, subito.
-        val pm = getSystemService(PowerManager::class.java)
-        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-            runCatching {
-                startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
-            }
-        }
         setContent {
             NoAlarmWatchTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

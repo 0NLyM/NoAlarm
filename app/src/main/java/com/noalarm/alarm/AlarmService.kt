@@ -29,6 +29,7 @@ import com.noalarm.data.Alarm
 import com.noalarm.data.KeyAction
 import com.noalarm.data.Store
 import com.noalarm.glyph.GlyphController
+import com.noalarm.wear.WearBridge
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.math.sqrt
 
@@ -82,6 +83,7 @@ class AlarmService : Service() {
         play(alarm)
         if (alarm.vibrate) vibrate()
         if (alarm.glyph) GlyphController.ring(this, alarm.label, alarm.glyphStyle)
+        if (alarm.ringOnWatch) WearBridge.ringOnWatches(this, alarm)
         listenScreenOff()
         listenMotion()
 
@@ -234,6 +236,7 @@ class AlarmService : Service() {
     private fun finish(keepGlyph: Boolean) {
         ringing.value = 0L
         if (!keepGlyph) GlyphController.stop()
+        WearBridge.stopOnWatches(this)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }

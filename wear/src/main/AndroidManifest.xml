@@ -3,23 +3,6 @@
 
     <uses-feature android:name="android.hardware.type.watch" android:required="true" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
-    <!-- Sveglie programmate localmente (WatchAlarmScheduler), stessa coppia
-         del telefono: USE_EXACT_ALARM e' normale e concesso all'installazione
-         per un'app la cui funzione principale sono le sveglie. -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
-    <!-- Eco della sveglia via Bluetooth diretto (vedi BridgeService.kt): il
-         permesso runtime BLUETOOTH_CONNECT vale dalla 31 in su, sotto quella
-         soglia bastano i permessi normali qui sotto (concessi all'installazione). -->
-    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <application
         android:allowBackup="false"
@@ -56,27 +39,15 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.NoAlarmWatch" />
 
-        <!-- In ascolto permanente del telefono via Bluetooth diretto (RFCOMM). -->
+        <!-- Riceve dal telefono l'ordine di far suonare/smettere l'eco, via Data Layer API. -->
         <service
-            android:name=".BridgeService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
-
-        <receiver
-            android:name=".BootReceiver"
-            android:exported="false">
+            android:name=".RingListenerService"
+            android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/noalarm" />
             </intent-filter>
-        </receiver>
-
-        <!-- Sveglia con eco programmata localmente via AlarmManager (WatchAlarmScheduler):
-             un BroadcastReceiver innescato dall'AlarmManager e' esente dai limiti di avvio
-             in background, a differenza di un Service, quindi puo' aprire RingActivity a
-             schermo intero anche senza una connessione Bluetooth attiva in quel momento. -->
-        <receiver
-            android:name=".WatchAlarmReceiver"
-            android:exported="false" />
+        </service>
 
     </application>
 </manifest>

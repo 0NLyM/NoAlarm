@@ -135,7 +135,7 @@ Prima usava il Material3 di default (schema colori chiaro/scuro di sistema), nes
 
 ## Versioni Attuali
 
-- **App**: v1.4.35 (versionCode 56)
+- **App**: v1.4.36 (versionCode 57)
 - **Watch**: v1.3.0 (versionCode 14) — di nuovo contattata dal telefono da v1.4.35 (vedi "Eco sul Watch via Data Layer API").
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.

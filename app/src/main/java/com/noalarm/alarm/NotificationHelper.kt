@@ -74,29 +74,29 @@ object NotificationHelper {
     )
 
     /**
-     * Notifica bridgeabile su Wear OS mostrata mentre la sveglia suona.
-     * Deve restare del tutto slegata dal foreground service: Android esclude
-     * le notifiche "media playback" dal rendere lo swipe possibile (eccezione
-     * alla dismissibilita' introdotta in Android 14) e Wear OS non bridgea
-     * mai una notifica ongoing — nessun flag messo qui sull'oggetto risolve
-     * il bridging se e' comunque quello passato a startForeground(). Per
-     * questo [AlarmService] la posta separatamente da [foregroundPlaceholder]
-     * con [ID_RINGING] invece che con l'id del foreground service.
+     * Notifica bridgeabile su Wear OS mostrata mentre la sveglia suona. Prova
+     * reale sul TicWatch E3: la notifica di preavviso ([showAlarmReminder],
+     * canale [CH_UPCOMING], nessuna [NotificationCompat.CATEGORY_ALARM]) arriva
+     * sul watch, questa no — a parita' di `setOngoing`/`setFullScreenIntent`/
+     * `setLocalOnly` (nessuno dei tre presente in entrambe). L'unica differenza
+     * residua era il canale/categoria, quindi ricostruita a partire dallo
+     * stesso builder di [showAlarmReminder] (stesso [CH_UPCOMING], niente
+     * `setCategory`/`setPriority`/`setVisibility`) invece che da [CH_ALARM] —
+     * deve restare comunque slegata dal foreground service (vedi
+     * [foregroundPlaceholder]), che resta su [CH_ALARM] per l'allerta sul
+     * telefono.
      */
     fun ringing(c: Context, alarm: Alarm): Notification {
         val full = fullScreenIntent(c, alarm)
         val s = Store.settings.value
-        return NotificationCompat.Builder(c, CH_ALARM)
+        return NotificationCompat.Builder(c, CH_UPCOMING)
             .setSmallIcon(R.drawable.ic_stat_alarm)
             .setContentTitle(alarm.label.ifBlank { "Sveglia" })
             .setContentText(Format.hhmm(alarm.hour, alarm.minute, s.use24h))
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(false)
             .setContentIntent(full)
-            .addAction(0, "POSTICIPA", action(c, ActionReceiver.SNOOZE, alarm.id))
-            .addAction(0, "SPEGNI", action(c, ActionReceiver.DISMISS, alarm.id))
+            .setAutoCancel(false)
+            .addAction(R.drawable.ic_stat_alarm, "POSTICIPA", action(c, ActionReceiver.SNOOZE, alarm.id))
+            .addAction(R.drawable.ic_stat_alarm, "SPEGNI", action(c, ActionReceiver.DISMISS, alarm.id))
             .setLocalOnly(!alarm.ringOnWatch)
             .build()
     }

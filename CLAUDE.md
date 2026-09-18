@@ -182,13 +182,20 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
     - **Fix**: due notifiche distinte in `NotificationHelper.kt` — `foregroundPlaceholder()` (id `ID_RINGING_FGS`, lega il foreground service, sempre `setLocalOnly(true)`, porta lo schermo intero sul telefono) e `ringing()` (id `ID_RINGING`, postata con `NotificationManagerCompat.notify()` senza mai passare da `startForeground`, mai ongoing, unica candidata al bridging, governata da `setLocalOnly(!alarm.ringOnWatch)` come sempre). Non ancora verificato su TicWatch E3.
 
 ### Lint Failure `wear:lintVitalRelease`
-✅ **Risolto in v1.4.13**: `play-services-wearable` tirava transitive fragment old, aggiunto `libs.androidx.fragment.ktx`. Poi rimosso tutto `play-services-wearable` quando passato a RFCOMM.
+✅ **Risolto in v1.4.13**: `play-services-wearable` tirava transitive fragment old, aggiunto `libs.androidx.fragment.ktx`. Rimosso quando passato a RFCOMM (v1.1.x), **rimesso in v1.4.35** col ritorno alla Data Layer API — se il fragment transitivo vecchio si ripresenta in CI, e' lo stesso fix (`libs.androidx.fragment.ktx`, gia' in `libs.versions.toml` ma non piu' applicato da nessun modulo dopo la rimozione: verificare se serve riaggiungerlo a `wear/build.gradle.kts`).
 
 ## Data Model
 
 - `Alarm.ringOnWatch: Boolean` (default true) → sveglia suona anche sul watch; gate sia di `WearBridge.ringOnWatches()` (Data Layer API, v1.4.35) sia di `setLocalOnly(!ringOnWatch)` sulla notifica bridgeabile (v1.4.26+)
 - `Settings.defaultRingOnWatch` → preferenza per nuove sveglie
 - UI: switch in `AlarmScreen` riga 647, chip selector per gruppi esistenti
+
+## Backup/Ripristino Configurazione (v1.4.35)
+
+Impostazioni → sezione "Backup": esporta/importa sveglie + impostazioni (non timer/cronometro, sono stato transitorio, non configurazione) in un file `.json` scelto dall'utente via Storage Access Framework (`ActivityResultContracts.CreateDocument`/`OpenDocument` in `SettingsScreen.kt`, nessun permesso di storage necessario — scoped storage, come il picker suoneria gia' usato in `AlarmScreen.kt`).
+
+- `Store.exportJson()`/`Store.importJson()` (`Store.kt`) riusano per intero la (de)serializzazione JSON gia' esistente per `Alarm`/`Settings` (`json(a: Alarm)`, `alarmOf()`, `json(s: Settings)`, `settingsOf()`) — nessun formato nuovo da mantenere in parallelo, un unico `JSONObject` con le chiavi `alarms` (array) e `settings` (oggetto).
+- `importJson()` sostituisce per intero sveglie e impostazioni attuali (non fa merge) e ritorna `false` senza toccare nulla se il JSON non e' valido (`runCatching`) — l'utente vede l'esito ("Configurazione importata"/"File non valido: nessuna modifica") sotto i due pulsanti.
 
 ## CI/Release Pipeline
 

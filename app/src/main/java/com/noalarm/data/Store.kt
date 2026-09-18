@@ -88,6 +88,25 @@ object Store {
         prefs.edit().putString("settings", json(_settings.value).toString()).apply()
     }
 
+    // --- backup/ripristino -------------------------------------------------
+
+    /** Sveglie e impostazioni in un unico JSON leggibile: non timer/cronometro, sono stato transitorio. */
+    fun exportJson(): String = JSONObject().apply {
+        put("alarms", JSONArray(_alarms.value.map { json(it) }))
+        put("settings", json(_settings.value))
+    }.toString(2)
+
+    /** Sostituisce sveglie e impostazioni con quelle del JSON. false se il file non e' valido: nessuna modifica. */
+    fun importJson(raw: String): Boolean = runCatching {
+        val root = JSONObject(raw)
+        val arr = root.getJSONArray("alarms")
+        _alarms.value = (0 until arr.length()).map { alarmOf(arr.getJSONObject(it)) }
+            .sortedWith(compareBy({ it.hour }, { it.minute }, { it.id }))
+        _settings.value = settingsOf(root.getJSONObject("settings"))
+        writeAlarms()
+        prefs.edit().putString("settings", json(_settings.value).toString()).apply()
+    }.isSuccess
+
     // --- (de)serializzazione ---------------------------------------------
 
     private fun <T> readList(key: String, of: (JSONObject) -> T): List<T> {

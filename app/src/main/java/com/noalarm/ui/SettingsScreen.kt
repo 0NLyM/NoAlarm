@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings as AndroidSettings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -60,6 +62,20 @@ fun SettingsScreen() {
     val s by Store.settings.collectAsStateWithLifecycle()
     var glyphTest by remember { mutableStateOf(false) }
     var wearDiagnostics by remember { mutableStateOf<String?>(null) }
+    var backupResult by remember { mutableStateOf<String?>(null) }
+    val exportBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        backupResult = runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { it.write(Store.exportJson().toByteArray()) }
+        }.fold({ "Configurazione esportata." }, { "Esportazione fallita." })
+    }
+    val importBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val raw = runCatching {
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+        }.getOrNull()
+        backupResult = if (raw != null && Store.importJson(raw)) "Configurazione importata." else "File non valido: nessuna modifica."
+    }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -164,6 +180,26 @@ fun SettingsScreen() {
                 Store.update { it.copy(fontFamily = next) }
             },
         )
+
+        SectionLabel("Backup")
+        RowItem(
+            title = "Esporta configurazione",
+            subtitle = "Sveglie e impostazioni in un file .json",
+            onClick = { exportBackup.launch("noalarm-backup.json") },
+        )
+        RowItem(
+            title = "Importa configurazione",
+            subtitle = "Sostituisce sveglie e impostazioni attuali",
+            onClick = { importBackup.launch(arrayOf("application/json")) },
+        )
+        backupResult?.let {
+            Text(
+                it,
+                Modifier.padding(horizontal = 4.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         SectionLabel("Sistema")
         if (Build.VERSION.SDK_INT >= 31 && !AlarmScheduler.canScheduleExact(context)) {

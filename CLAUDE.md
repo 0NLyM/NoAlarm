@@ -135,8 +135,8 @@ Prima usava il Material3 di default (schema colori chiaro/scuro di sistema), nes
 
 ## Versioni Attuali
 
-- **App**: v1.4.34 (versionCode 55)
-- **Watch**: v1.2.0 (versionCode 13) — non piu' toccata da v1.4.26, il modulo `:wear` e' orfano (vedi "Eco sul Watch via Notification Bridging di Sistema").
+- **App**: v1.4.35 (versionCode 56)
+- **Watch**: v1.3.0 (versionCode 14) — di nuovo contattata dal telefono da v1.4.35 (vedi "Eco sul Watch via Data Layer API").
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
 
@@ -226,4 +226,4 @@ Impostazioni → sezione "Backup": esporta/importa sveglie + impostazioni (non t
 
 ---
 
-**Ultima revisione**: v1.4.34 (17 Sep 2026) — causa reale individuata via documentazione ufficiale Android/Wear OS: la notifica sveglia restava sempre *ongoing* perche' e' l'argomento di `startForeground(..., FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)`, e le notifiche "media playback" sono l'eccezione esplicita alla dismissibilita' introdotta in Android 14 — togliere `setOngoing(true)` dal `Builder` (v1.4.33) non basta perche' il sistema la rimette comunque. Fix: notifica del foreground service e notifica bridgeabile sono ora due oggetti `Notification` separati (vedi Causa 12 e `NotificationHelper.kt`). Non ancora verificato su TicWatch E3 — prossimo test con "Prova la sveglia adesso".
+**Ultima revisione**: v1.4.35 (18 Sep 2026) — dopo 12 cause esplorate sul notification bridging senza risultati reali, ripristinato in parallelo il meccanismo Wearable Data Layer API del commit 3c7fb98 (mai davvero testato su questo TicWatch E3 a suo tempo): `WearBridge`/`PhoneWearService` (`:app`, nuovi) e `RingListenerService` (`:wear`, nuovo) sostituiscono i file RFCOMM/AlarmManager ormai orfani (`BridgeService`/`WatchAlarmScheduler`/`WatchAlarmReceiver`/`BootReceiver`, rimossi). Aggiunta anche la sezione "Backup" in Impostazioni (esporta/importa sveglie+impostazioni in JSON, vedi "Backup/Ripristino Configurazione"). Nessuno dei due ancora verificato su hardware reale — prossimo test con "Prova la sveglia adesso".

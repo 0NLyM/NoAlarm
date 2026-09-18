@@ -32,8 +32,8 @@ android {
         // Wear OS 3+: e' la versione minima su cui punta questa app.
         minSdk = 30
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.2.0"
+        versionCode = 14
+        versionName = "1.3.0"
     }
 
     signingConfigs {

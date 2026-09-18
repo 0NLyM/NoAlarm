@@ -99,6 +99,9 @@ dependencies {
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
 
-    // Eco della sveglia sul watch WearOS abbinato, via Data Layer API.
+    // Eco della sveglia sul watch WearOS abbinato, via Data Layer API. Tira una
+    // fragment transitiva vecchia che rompe lintVitalRelease (registerForActivityResult
+    // richiede Fragment >= 1.3.0) — stesso fix gia' servito per :wear in v1.4.13.
     implementation(libs.play.services.wearable)
+    implementation(libs.androidx.fragment.ktx)
 }

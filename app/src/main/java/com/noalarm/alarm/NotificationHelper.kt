@@ -74,29 +74,25 @@ object NotificationHelper {
     )
 
     /**
-     * Notifica bridgeabile su Wear OS mostrata mentre la sveglia suona. Prova
-     * reale sul TicWatch E3: la notifica di preavviso ([showAlarmReminder],
-     * canale [CH_UPCOMING], nessuna [NotificationCompat.CATEGORY_ALARM]) arriva
-     * sul watch, questa no — a parita' di `setOngoing`/`setFullScreenIntent`/
-     * `setLocalOnly` (nessuno dei tre presente in entrambe). L'unica differenza
-     * residua era il canale/categoria, quindi ricostruita a partire dallo
-     * stesso builder di [showAlarmReminder] (stesso [CH_UPCOMING], niente
-     * `setCategory`/`setPriority`/`setVisibility`) invece che da [CH_ALARM] —
-     * deve restare comunque slegata dal foreground service (vedi
-     * [foregroundPlaceholder]), che resta su [CH_ALARM] per l'allerta sul
-     * telefono.
+     * Notifica bridgeabile su Wear OS mostrata mentre la sveglia suona.
+     * v1.4.37 — ridotta al minimo per isolare una variabile alla volta: ne'
+     * il canale [CH_UPCOMING] al posto di [CH_ALARM] (Causa 13) ne' togliere
+     * `setOngoing`/`setFullScreenIntent` da soli (Causa 12/v1.4.33) erano
+     * bastati da soli. Si riparte dalla "normale" notifica sveglia — canale
+     * [CH_ALARM] (quello semanticamente corretto per un allarme), icona,
+     * titolo, testo, tap — SENZA azioni/categoria/priorita'/visibilita': se
+     * anche questa non arriva sul watch, il problema non e' negli attributi
+     * del `Builder` ma altrove (permesso/canale in se'/OEM). Una volta
+     * confermato che questa versione minima bridgea, si riaggiungono
+     * Posticipa/Spegni una alla volta.
      */
     fun ringing(c: Context, alarm: Alarm): Notification {
-        val full = fullScreenIntent(c, alarm)
         val s = Store.settings.value
-        return NotificationCompat.Builder(c, CH_UPCOMING)
+        return NotificationCompat.Builder(c, CH_ALARM)
             .setSmallIcon(R.drawable.ic_stat_alarm)
             .setContentTitle(alarm.label.ifBlank { "Sveglia" })
             .setContentText(Format.hhmm(alarm.hour, alarm.minute, s.use24h))
-            .setContentIntent(full)
-            .setAutoCancel(false)
-            .addAction(R.drawable.ic_stat_alarm, "POSTICIPA", action(c, ActionReceiver.SNOOZE, alarm.id))
-            .addAction(R.drawable.ic_stat_alarm, "SPEGNI", action(c, ActionReceiver.DISMISS, alarm.id))
+            .setContentIntent(fullScreenIntent(c, alarm))
             .setLocalOnly(!alarm.ringOnWatch)
             .build()
     }

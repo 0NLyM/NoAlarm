@@ -2,6 +2,7 @@
     <string name="app_name">NoAlarm</string>
     <string name="glyph_toy_summary">Ora corrente. Durante una sveglia: pressione breve per posticipare, lunga per spegnere.</string>
     <string name="channel_alarm">Sveglie</string>
+    <string name="channel_alarm_watch">Sveglie (eco watch)</string>
     <string name="channel_upcoming">Sveglia imminente</string>
     <string name="channel_timer">Timer e cronometro</string>
     <string name="channel_bedtime">Ora di dormire</string>

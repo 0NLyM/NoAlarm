@@ -246,15 +246,14 @@ fun SettingsScreen() {
  */
 private fun collectWearDiagnostics(c: Context): String {
     val nm = NotificationManagerCompat.from(c)
-    // v1.4.37: NotificationHelper.ringing() e' tornata su CH_ALARM (il canale
-    // semanticamente corretto per un allarme) dopo che anche CH_UPCOMING da
-    // solo non bastava a farla bridgeare.
+    // v1.4.38: NotificationHelper.ringing() usa CH_ALARM_WATCH (suono/
+    // vibrazione di default, a differenza di CH_ALARM che li disattiva).
     val importance = c.getSystemService(NotificationManager::class.java)
-        .getNotificationChannel(NotificationHelper.CH_ALARM)?.importance
+        .getNotificationChannel(NotificationHelper.CH_ALARM_WATCH)?.importance
     val bluetoothOn = runCatching { c.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled }.getOrNull()
     val listeners = NotificationManagerCompat.getEnabledListenerPackages(c)
     return "Notifiche attive: ${nm.areNotificationsEnabled()}\n" +
-        "Importanza canale sveglia: $importance (4 = alta, quella impostata)\n" +
+        "Importanza canale sveglia (watch): $importance (4 = alta, quella impostata)\n" +
         "Bluetooth attivo: ${bluetoothOn ?: "sconosciuto"}\n" +
         "App con accesso alle notifiche: ${listeners.ifEmpty { setOf("nessuna") }.joinToString()}"
 }

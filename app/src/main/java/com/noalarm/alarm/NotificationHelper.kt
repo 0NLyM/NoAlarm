@@ -17,6 +17,7 @@ import com.noalarm.data.Store
 object NotificationHelper {
 
     const val CH_ALARM = "alarm"
+    const val CH_ALARM_WATCH = "alarm_watch"
     const val CH_UPCOMING = "upcoming"
     const val CH_CLOCK = "clock"
     const val CH_BEDTIME = "bedtime"
@@ -36,6 +37,16 @@ object NotificationHelper {
             NotificationChannel(CH_ALARM, c.getString(R.string.channel_alarm), NotificationManager.IMPORTANCE_HIGH).apply {
                 setSound(null, null)          // il suono lo gestisce AlarmService
                 enableVibration(false)
+                setBypassDnd(true)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
+        )
+        nm.createNotificationChannel(
+            // Suono/vibrazione di default (non silenziati come CH_ALARM): il
+            // watch sembra decidere popup/vibrazione dell'eco bridgeata in base
+            // a queste impostazioni del canale, non solo da categoria/priorita'.
+            NotificationChannel(CH_ALARM_WATCH, c.getString(R.string.channel_alarm_watch), NotificationManager.IMPORTANCE_HIGH).apply {
+                enableVibration(true)
                 setBypassDnd(true)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
@@ -75,20 +86,25 @@ object NotificationHelper {
 
     /**
      * Notifica bridgeabile su Wear OS mostrata mentre la sveglia suona.
-     * v1.4.37 (minima, zero azioni, [CH_ALARM]): confermato che arriva sul
-     * watch, ma silenziosa e senza popup — bridgeata come card passiva, non
-     * come allerta. Guardando tutte le prove reali in ordine, il fattore
-     * comune a ogni versione che NON e' mai arrivata (v1.4.33/34 su
-     * [CH_ALARM] con azioni, v1.4.36 su [CH_UPCOMING] con azioni) sono le
-     * `addAction`, non canale/categoria: quelle restano a zero. Si riaggiunge
-     * qui `setCategory`/`setPriority`/`setVisibility` — il segnale
-     * documentato che dice a Wear OS di trattarla come allerta invece che
-     * come card — per vedere se basta a riportare popup/vibrazione senza
-     * reintrodurre le azioni sospettate.
+     * v1.4.37 (minima, zero azioni, [CH_ALARM]): confermata bridgeata per la
+     * prima volta, ma silenziosa e senza popup. v1.4.38 (aggiunti
+     * categoria/priorita'/visibilita', ancora su [CH_ALARM]): stesso
+     * risultato, ancora silenziosa — quindi non erano quelli il segnale che
+     * manca. Le altre app che sul watch arrivano CON popup/vibrazione usano
+     * canali col suono/vibrazione di default; [CH_ALARM] li disattiva
+     * apposta ([setSound]`(null, null)`, `enableVibration(false)`) perche' e'
+     * [AlarmService] a gestire audio/vibrazione sul telefono — probabile che
+     * il watch decida se allertare in base a queste impostazioni di canale,
+     * non (solo) da categoria/priorita'. Per questo la notifica bridgeabile
+     * ora usa [CH_ALARM_WATCH], un canale gemello con suono/vibrazione di
+     * default invece che silenziati: costa un singolo impulso in piu' sul
+     * telefono quando la notifica viene postata (irrilevante, la sveglia sta
+     * gia' squillando in quel momento), ma e' l'unica differenza rimasta fra
+     * questa notifica e una "normale".
      */
     fun ringing(c: Context, alarm: Alarm): Notification {
         val s = Store.settings.value
-        return NotificationCompat.Builder(c, CH_ALARM)
+        return NotificationCompat.Builder(c, CH_ALARM_WATCH)
             .setSmallIcon(R.drawable.ic_stat_alarm)
             .setContentTitle(alarm.label.ifBlank { "Sveglia" })
             .setContentText(Format.hhmm(alarm.hour, alarm.minute, s.use24h))

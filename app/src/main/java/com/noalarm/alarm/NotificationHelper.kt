@@ -85,20 +85,28 @@ object NotificationHelper {
     )
 
     /**
-     * Notifica bridgeabile su Wear OS mostrata mentre la sveglia suona.
-     * Canale [CH_ALARM_WATCH] (suono/vibrazione di default, a differenza di
-     * [CH_ALARM]): confermato su TicWatch E3 con popup e vibrazione, prima
-     * senza azioni (v1.4.39) poi con la sola SPEGNI (v1.4.40) — la Causa 14
-     * ("le azioni bloccano il bridging") era sbagliata, era sempre il canale.
-     * Rimessa anche POSTICIPA.
+     * Notifica bridgeabile su Wear OS mostrata mentre la sveglia suona —
+     * l'UNICA notifica pensata per essere vista/usata dall'utente, sia sul
+     * telefono che sul watch. Canale [CH_ALARM_WATCH] (suono/vibrazione di
+     * default, a differenza di [CH_ALARM]): confermato su TicWatch E3 con
+     * popup, vibrazione e azioni Posticipa/Spegni funzionanti.
+     *
+     * Porta anche lo schermo intero sul telefono ([setFullScreenIntent]):
+     * prima stava sulla notifica separata [foregroundPlaceholder], ma
+     * spostarlo qui elimina il "doppione" che l'utente vedeva sul telefono
+     * (due notifiche sveglia, una delle due senza pulsanti) — fullScreenIntent
+     * non e' fra le 4 condizioni che escludono una notifica dal bridging
+     * (Causa 12), quindi non rischia di rompere l'eco sul watch.
      */
     fun ringing(c: Context, alarm: Alarm): Notification {
+        val full = fullScreenIntent(c, alarm)
         val s = Store.settings.value
         return NotificationCompat.Builder(c, CH_ALARM_WATCH)
             .setSmallIcon(R.drawable.ic_stat_alarm)
             .setContentTitle(alarm.label.ifBlank { "Sveglia" })
             .setContentText(Format.hhmm(alarm.hour, alarm.minute, s.use24h))
-            .setContentIntent(fullScreenIntent(c, alarm))
+            .setContentIntent(full)
+            .setFullScreenIntent(full, true)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -109,25 +117,23 @@ object NotificationHelper {
     }
 
     /**
-     * Notifica minima usata solo per soddisfare startForeground(..., MEDIA_PLAYBACK):
-     * e' lei che porta lo schermo intero sul telefono anche a schermo spento
-     * (serve il fullScreenIntent su *qualche* notifica visibile subito), ma
-     * resta sempre [NotificationCompat.Builder.setLocalOnly] per non offrire
-     * a Wear OS una seconda copia, ongoing e quindi mai bridgeata comunque,
-     * della sveglia.
+     * Notifica-segnaposto: serve solo a soddisfare l'obbligo di Android di
+     * mostrare una notifica per `startForeground(..., MEDIA_PLAYBACK)`, mai
+     * pensata per l'utente. Deliberatamente minima (nessun titolo/orario
+     * della sveglia, nessuna azione) cosi' non sembra una seconda sveglia con
+     * i pulsanti mancanti — quella vera, con tutto il resto, e' [ringing].
+     * Resta su [CH_ALARM] e sempre `setLocalOnly(true)`: e' comunque ongoing
+     * per via del foreground service (Causa 12), quindi Wear OS la
+     * scarterebbe da sola — locale esplicitamente solo per non offrirla
+     * proprio come seconda copia inutile.
      */
-    fun foregroundPlaceholder(c: Context, alarm: Alarm): Notification {
-        val full = fullScreenIntent(c, alarm)
-        return NotificationCompat.Builder(c, CH_ALARM)
+    fun foregroundPlaceholder(c: Context, alarm: Alarm): Notification =
+        NotificationCompat.Builder(c, CH_ALARM)
             .setSmallIcon(R.drawable.ic_stat_alarm)
-            .setContentTitle(alarm.label.ifBlank { "Sveglia" })
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setFullScreenIntent(full, true)
-            .setContentIntent(full)
+            .setContentTitle("NoAlarm")
+            .setContentIntent(fullScreenIntent(c, alarm))
             .setLocalOnly(true)
             .build()
-    }
 
     /**
      * Preavviso di questa sveglia, programmato dal sistema esattamente

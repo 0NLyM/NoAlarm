@@ -75,16 +75,16 @@ object NotificationHelper {
 
     /**
      * Notifica bridgeabile su Wear OS mostrata mentre la sveglia suona.
-     * v1.4.37 — ridotta al minimo per isolare una variabile alla volta: ne'
-     * il canale [CH_UPCOMING] al posto di [CH_ALARM] (Causa 13) ne' togliere
-     * `setOngoing`/`setFullScreenIntent` da soli (Causa 12/v1.4.33) erano
-     * bastati da soli. Si riparte dalla "normale" notifica sveglia — canale
-     * [CH_ALARM] (quello semanticamente corretto per un allarme), icona,
-     * titolo, testo, tap — SENZA azioni/categoria/priorita'/visibilita': se
-     * anche questa non arriva sul watch, il problema non e' negli attributi
-     * del `Builder` ma altrove (permesso/canale in se'/OEM). Una volta
-     * confermato che questa versione minima bridgea, si riaggiungono
-     * Posticipa/Spegni una alla volta.
+     * v1.4.37 (minima, zero azioni, [CH_ALARM]): confermato che arriva sul
+     * watch, ma silenziosa e senza popup — bridgeata come card passiva, non
+     * come allerta. Guardando tutte le prove reali in ordine, il fattore
+     * comune a ogni versione che NON e' mai arrivata (v1.4.33/34 su
+     * [CH_ALARM] con azioni, v1.4.36 su [CH_UPCOMING] con azioni) sono le
+     * `addAction`, non canale/categoria: quelle restano a zero. Si riaggiunge
+     * qui `setCategory`/`setPriority`/`setVisibility` — il segnale
+     * documentato che dice a Wear OS di trattarla come allerta invece che
+     * come card — per vedere se basta a riportare popup/vibrazione senza
+     * reintrodurre le azioni sospettate.
      */
     fun ringing(c: Context, alarm: Alarm): Notification {
         val s = Store.settings.value
@@ -93,6 +93,9 @@ object NotificationHelper {
             .setContentTitle(alarm.label.ifBlank { "Sveglia" })
             .setContentText(Format.hhmm(alarm.hour, alarm.minute, s.use24h))
             .setContentIntent(fullScreenIntent(c, alarm))
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setLocalOnly(!alarm.ringOnWatch)
             .build()
     }

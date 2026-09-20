@@ -135,7 +135,7 @@ Prima usava il Material3 di default (schema colori chiaro/scuro di sistema), nes
 
 ## Versioni Attuali
 
-- **App**: v1.4.39 (versionCode 60)
+- **App**: v1.4.40 (versionCode 61)
 - **Watch**: v1.3.0 (versionCode 14) — di nuovo contattata dal telefono da v1.4.35 (vedi "Eco sul Watch via Data Layer API").
 
 Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14 — ora incrementa correttamente.
@@ -190,6 +190,9 @@ Nota: il versionCode della watch era hardcoded a 1 per ogni build fino a v1.4.14
     - **Prova reale (v1.4.38, utente su TicWatch E3): ancora silenziosa, senza popup — a differenza delle altre notifiche (di altre app) che sul watch mostrano popup e vibrano.** Categoria/priorita'/visibilita' non erano il segnale mancante.
 15. **Causa 15 (v1.4.39, causa reale sospetta — suono/vibrazione del canale, non categoria/priorita')**: `CH_ALARM` disattiva deliberatamente suono e vibrazione a livello di canale (`setSound(null, null)`, `enableVibration(false)`) perche' e' `AlarmService` a gestire audio/vibrazione sul telefono, non il canale — ma le altre app che arrivano sul watch CON popup/vibrazione usano canali col suono/vibrazione di *default* (non disattivati). Ipotesi: il watch decide se trattare la notifica bridgeata come allerta interruttiva (popup+vibra) in base a queste impostazioni di canale (assenti su `CH_ALARM`), non (solo) da categoria/priorita' — spiegherebbe perche' la Causa 14 (rimesse categoria/priorita'/visibilita', v1.4.38) non ha cambiato nulla: quelle non erano mai state la vera differenza rispetto a una notifica "normale".
     - **Fix**: nuovo canale `CH_ALARM_WATCH` (`alarm_watch`), gemello di `CH_ALARM` ma con suono/vibrazione di *default* invece che silenziati — usato solo da `ringing()` (la notifica bridgeabile), mentre `foregroundPlaceholder()` resta su `CH_ALARM` (silenzioso, dato che l'allerta vera sul telefono la fa `AlarmService`). Costo accettato: un singolo impulso sonoro/vibrazione in piu' sul telefono quando `ringing()` viene postata (irrilevante, la sveglia sta gia' squillando in quel momento). `collectWearDiagnostics()` aggiornato per leggere l'importanza di `CH_ALARM_WATCH`.
+    - **Prova reale (v1.4.39, utente su TicWatch E3): confermato!** Prima volta che l'eco arriva sul watch **con popup e vibrazione**, come le notifiche di altre app. Causa 15 confermata.
+16. **Causa 16 (v1.4.40, in test — le azioni tornano, una alla volta)**: con `CH_ALARM_WATCH` confermato corretto per l'allerta, resta da capire se l'ipotesi della Causa 14 ("le `addAction` bloccano l'arrivo") era reale o una coincidenza — tutte le versioni con due azioni insieme (v1.4.33/34, v1.4.36) usavano anche un canale diverso da `CH_ALARM_WATCH`, quindi potrebbe essere stato il canale sbagliato anche allora, non le azioni.
+    - **Fix (in test)**: riaggiunta una sola azione (SPEGNI) su `ringing()`, lasciando fuori POSTICIPA — se arriva ancora con popup/vibrazione, si riaggiunge anche l'altra; se sparisce di nuovo, le azioni sono davvero la causa e serve un approccio diverso per dare Posticipa/Spegni dal watch (es. solo tramite `RingActivity`/Data Layer API, mai testata per davvero su questo hardware, vedi "Eco sul Watch via Data Layer API").
     - Non ancora riverificato su TicWatch E3 dopo questo fix.
 
 ### Lint Failure `lintVitalRelease` (watch e/o phone)
@@ -223,7 +226,7 @@ Impostazioni → sezione "Backup": esporta/importa sveglie + impostazioni (non t
 | Path | Ruolo |
 |------|-------|
 | `app/build.gradle.kts` | Versioning app, dipendenze phone |
-| `app/src/main/java/com/noalarm/alarm/NotificationHelper.kt` | Costruisce le notifiche sveglia; da v1.4.34 sono due oggetti separati — `ringing()` (bridgeabile, confermata arrivare sul watch da v1.4.37; zero azioni; da v1.4.39 su `CH_ALARM_WATCH`, suono/vibrazione di default, per il popup) e `foregroundPlaceholder()` (lega il foreground service, sempre `setLocalOnly(true)`, su `CH_ALARM` silenzioso) — vedi "Causa 12"/"Causa 13"/"Causa 14"/"Causa 15" |
+| `app/src/main/java/com/noalarm/alarm/NotificationHelper.kt` | Costruisce le notifiche sveglia; da v1.4.34 sono due oggetti separati — `ringing()` (bridgeabile, confermata su TicWatch E3 con popup+vibrazione da v1.4.39 su `CH_ALARM_WATCH`; da v1.4.40 con l'azione SPEGNI riaggiunta, in test) e `foregroundPlaceholder()` (lega il foreground service, sempre `setLocalOnly(true)`, su `CH_ALARM` silenzioso) — vedi "Causa 12"-"Causa 16" |
 | `app/src/main/java/com/noalarm/alarm/AlarmScheduler.kt` | Scheduling phone |
 | `app/src/main/java/com/noalarm/alarm/AlarmService.kt` | Ring logic phone; da v1.4.35 chiama anche `WearBridge.ringOnWatches()`/`stopOnWatches()` |
 | `app/src/main/java/com/noalarm/wear/WearBridge.kt` | Manda l'eco al watch via Data Layer API (`Wearable.MessageClient`) — v1.4.35, vedi "Eco sul Watch via Data Layer API" |
@@ -237,4 +240,4 @@ Impostazioni → sezione "Backup": esporta/importa sveglie + impostazioni (non t
 
 ---
 
-**Ultima revisione**: v1.4.39 (20 Sep 2026) — prova reale: rimettere categoria/priorita'/visibilita' (v1.4.38, Causa 14) non ha risolto il popup/vibrazione mancanti sul watch, mentre le notifiche di altre app arrivano con entrambi. Nuova ipotesi (Causa 15): `CH_ALARM` disattiva deliberatamente suono e vibrazione a livello di canale (li gestisce `AlarmService` sul telefono) — probabile che sia proprio questo a far trattare l'eco bridgeata come card silenziosa invece che come allerta, indipendentemente da categoria/priorita'. Fix: nuovo canale gemello `CH_ALARM_WATCH` con suono/vibrazione di default, usato solo da `ringing()` (la notifica bridgeabile); `foregroundPlaceholder()` resta su `CH_ALARM` silenzioso. Da riverificare su TicWatch E3.
+**Ultima revisione**: v1.4.40 (20 Sep 2026) — **Causa 15 confermata**: l'eco su `CH_ALARM_WATCH` (suono/vibrazione di default) arriva sul TicWatch E3 con popup e vibrazione, per la prima volta in tutta questa saga. Prossimo passo (Causa 16, in test): riaggiunta una sola azione (SPEGNI) su `ringing()` per capire se le due `addAction` insieme erano davvero la causa dei fallimenti precedenti (Causa 14) o se era sempre il canale sbagliato. Se arriva ancora bene, si riaggiunge anche POSTICIPA nella prossima iterazione. Da verificare su TicWatch E3.

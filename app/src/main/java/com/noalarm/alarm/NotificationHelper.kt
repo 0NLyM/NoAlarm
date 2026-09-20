@@ -86,21 +86,17 @@ object NotificationHelper {
 
     /**
      * Notifica bridgeabile su Wear OS mostrata mentre la sveglia suona.
-     * v1.4.37 (minima, zero azioni, [CH_ALARM]): confermata bridgeata per la
-     * prima volta, ma silenziosa e senza popup. v1.4.38 (aggiunti
-     * categoria/priorita'/visibilita', ancora su [CH_ALARM]): stesso
-     * risultato, ancora silenziosa — quindi non erano quelli il segnale che
-     * manca. Le altre app che sul watch arrivano CON popup/vibrazione usano
-     * canali col suono/vibrazione di default; [CH_ALARM] li disattiva
-     * apposta ([setSound]`(null, null)`, `enableVibration(false)`) perche' e'
-     * [AlarmService] a gestire audio/vibrazione sul telefono — probabile che
-     * il watch decida se allertare in base a queste impostazioni di canale,
-     * non (solo) da categoria/priorita'. Per questo la notifica bridgeabile
-     * ora usa [CH_ALARM_WATCH], un canale gemello con suono/vibrazione di
-     * default invece che silenziati: costa un singolo impulso in piu' sul
-     * telefono quando la notifica viene postata (irrilevante, la sveglia sta
-     * gia' squillando in quel momento), ma e' l'unica differenza rimasta fra
-     * questa notifica e una "normale".
+     * v1.4.39 ([CH_ALARM_WATCH], suono/vibrazione di default, zero azioni):
+     * confermata su TicWatch E3 con popup E vibrazione — prima volta che
+     * arriva come allerta vera, non solo come card. Si riaggiunge qui una
+     * sola azione (SPEGNI) invece di entrambe insieme: le versioni con due
+     * azioni (v1.4.33/34 su `CH_ALARM`, v1.4.36 su `CH_UPCOMING`) non erano
+     * mai arrivate affatto (Causa 14, ipotesi mai isolata per davvero — con
+     * `CH_ALARM_WATCH` ora confermato corretto per l'allerta, potrebbe non
+     * essere stato "le azioni" ma proprio il canale sbagliato anche allora).
+     * Se questa singola azione arriva ancora con popup/vibrazione, si
+     * riaggiunge anche POSTICIPA; se sparisce di nuovo, isola le azioni come
+     * causa reale invece che coincidenza.
      */
     fun ringing(c: Context, alarm: Alarm): Notification {
         val s = Store.settings.value
@@ -112,6 +108,7 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .addAction(R.drawable.ic_stat_alarm, "SPEGNI", action(c, ActionReceiver.DISMISS, alarm.id))
             .setLocalOnly(!alarm.ringOnWatch)
             .build()
     }

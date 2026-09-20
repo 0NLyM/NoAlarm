@@ -86,17 +86,11 @@ object NotificationHelper {
 
     /**
      * Notifica bridgeabile su Wear OS mostrata mentre la sveglia suona.
-     * v1.4.39 ([CH_ALARM_WATCH], suono/vibrazione di default, zero azioni):
-     * confermata su TicWatch E3 con popup E vibrazione — prima volta che
-     * arriva come allerta vera, non solo come card. Si riaggiunge qui una
-     * sola azione (SPEGNI) invece di entrambe insieme: le versioni con due
-     * azioni (v1.4.33/34 su `CH_ALARM`, v1.4.36 su `CH_UPCOMING`) non erano
-     * mai arrivate affatto (Causa 14, ipotesi mai isolata per davvero — con
-     * `CH_ALARM_WATCH` ora confermato corretto per l'allerta, potrebbe non
-     * essere stato "le azioni" ma proprio il canale sbagliato anche allora).
-     * Se questa singola azione arriva ancora con popup/vibrazione, si
-     * riaggiunge anche POSTICIPA; se sparisce di nuovo, isola le azioni come
-     * causa reale invece che coincidenza.
+     * Canale [CH_ALARM_WATCH] (suono/vibrazione di default, a differenza di
+     * [CH_ALARM]): confermato su TicWatch E3 con popup e vibrazione, prima
+     * senza azioni (v1.4.39) poi con la sola SPEGNI (v1.4.40) — la Causa 14
+     * ("le azioni bloccano il bridging") era sbagliata, era sempre il canale.
+     * Rimessa anche POSTICIPA.
      */
     fun ringing(c: Context, alarm: Alarm): Notification {
         val s = Store.settings.value
@@ -108,6 +102,7 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .addAction(R.drawable.ic_stat_alarm, "POSTICIPA", action(c, ActionReceiver.SNOOZE, alarm.id))
             .addAction(R.drawable.ic_stat_alarm, "SPEGNI", action(c, ActionReceiver.DISMISS, alarm.id))
             .setLocalOnly(!alarm.ringOnWatch)
             .build()

@@ -157,6 +157,13 @@ data class Settings(
     val fontFamily: AppFont = AppFont.SYSTEM,
     /** Pallino rosso nel calendario per i giorni con una sveglia ripetuta. */
     val showRepeatingDots: Boolean = true,
+    /** Ordine scelto a mano dei gruppi di sveglie. Nuovi gruppi non ancora
+     * riordinati si accodano in ordine alfabetico, non entrano qui finche'
+     * l'utente non li sposta. */
+    val groupOrder: List<String> = emptyList(),
+    /** true = i gruppi compaiono prima delle sveglie senza gruppo; false (come
+     * finora) = dopo. */
+    val groupsOnTop: Boolean = false,
 ) {
     fun dayOrder(): List<DayOfWeek> {
         val all = DayOfWeek.values().toList()

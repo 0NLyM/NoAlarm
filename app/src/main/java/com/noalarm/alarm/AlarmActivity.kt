@@ -248,7 +248,7 @@ private fun Ringing(
                     selected = minutes,
                     enabled = !outOfSnoozes,
                     onChange = { minutes = it; onSnoozeChange(it) },
-                    diameter = 180.dp,
+                    diameter = 200.dp,
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         DotText(

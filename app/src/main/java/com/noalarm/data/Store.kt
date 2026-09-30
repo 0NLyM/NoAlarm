@@ -217,6 +217,8 @@ object Store {
         put("barAppearance", s.barAppearance.name)
         put("fontFamily", s.fontFamily.name)
         put("showRepeatingDots", s.showRepeatingDots)
+        put("groupOrder", JSONArray(s.groupOrder))
+        put("groupsOnTop", s.groupsOnTop)
     }
 
     private fun key(o: JSONObject, k: String, def: KeyAction) =
@@ -249,6 +251,8 @@ object Store {
         fontFamily = runCatching { AppFont.valueOf(o.optString("fontFamily", "SYSTEM")) }
             .getOrDefault(AppFont.SYSTEM),
         showRepeatingDots = o.optBoolean("showRepeatingDots", true),
+        groupOrder = strings(o, "groupOrder"),
+        groupsOnTop = o.optBoolean("groupsOnTop", false),
     )
 }
 

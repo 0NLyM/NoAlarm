@@ -41,6 +41,9 @@ import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +53,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -57,8 +61,10 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.rotate
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +75,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.noalarm.Format
@@ -80,6 +87,7 @@ import kotlinx.coroutines.delay
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalTime
+import kotlin.math.roundToInt
 
 @Composable
 fun AlarmScreen() {
@@ -92,6 +100,9 @@ fun AlarmScreen() {
     var editing by remember { mutableStateOf<Alarm?>(null) }
     var bedtime by remember { mutableStateOf(false) }
     var recentlyDeleted by remember { mutableStateOf<Alarm?>(null) }
+    // Solo per questa sessione: comprimere un gruppo non e' una preferenza
+    // che vale la pena salvare, si riapre in un tocco.
+    var collapsedGroups by remember { mutableStateOf(setOf<String>()) }
     val tick = rememberNow(30_000L)
 
     // Una sveglia a data singola gia' passata non ha piu' senso: si spegne da sola.
@@ -153,26 +164,65 @@ fun AlarmScreen() {
                 }
             }
 
-            // Gruppo vuoto = nessun'intestazione, in cima; gli altri gruppi
-            // in ordine alfabetico, ciascuno con la sua etichetta.
-            userAlarms.groupBy { it.group }.toSortedMap().forEach { (group, inGroup) ->
-                if (group.isNotBlank()) item(key = "group_$group") {
-                    Box(Modifier.padding(horizontal = 16.dp)) { SectionLabel(group.uppercase()) }
-                }
-                items(inGroup, key = { it.id }) { alarm ->
+            // Sveglie senza gruppo (gruppo vuoto) a parte da quelle raggruppate:
+            // le une o le altre vanno per prime a seconda di settings.groupsOnTop.
+            // I gruppi mai spostati a mano restano in ordine alfabetico, in
+            // coda a quelli gia' riordinati esplicitamente.
+            val byGroup = userAlarms.groupBy { it.group }
+            val ungrouped = byGroup[""].orEmpty()
+            val namedGroups = byGroup.keys.filter { it.isNotBlank() }
+            val orderedGroups = settings.groupOrder.filter { it in namedGroups } +
+                namedGroups.filter { it !in settings.groupOrder }.sorted()
+
+            fun moveGroup(name: String, delta: Int) {
+                val list = orderedGroups.toMutableList()
+                val i = list.indexOf(name)
+                val j = i + delta
+                if (i < 0 || j !in list.indices) return
+                list[i] = list[j].also { list[j] = list[i] }
+                Store.update { it.copy(groupOrder = list) }
+            }
+
+            // "null" rappresenta il gruppo delle sveglie senza gruppo, senza
+            // intestazione propria - la sua posizione fra i gruppi veri e
+            // propri e' l'unica cosa che dipende da settings.groupsOnTop.
+            val sections: List<String?> =
+                if (settings.groupsOnTop) orderedGroups + listOf(null) else listOf(null) + orderedGroups
+
+            sections.forEach { group ->
+                val inGroup = if (group == null) ungrouped else byGroup[group].orEmpty()
+                if (group != null) item(key = "group_$group") {
                     Box(Modifier.padding(horizontal = 16.dp)) {
-                        AlarmRow(
-                            alarm = alarm,
-                            use24h = settings.use24h,
-                            order = settings.dayOrder(),
-                            onToggle = {
-                                AlarmScheduler.save(
-                                    context,
-                                    alarm.copy(enabled = it, snoozedUntil = 0L, skipNext = false),
-                                )
+                        GroupHeader(
+                            name = group,
+                            collapsed = group in collapsedGroups,
+                            canMoveUp = orderedGroups.indexOf(group) > 0,
+                            canMoveDown = orderedGroups.indexOf(group) < orderedGroups.lastIndex,
+                            onToggleCollapse = {
+                                collapsedGroups = if (group in collapsedGroups) collapsedGroups - group
+                                else collapsedGroups + group
                             },
-                            onClick = { editing = alarm },
+                            onMoveUp = { moveGroup(group, -1) },
+                            onMoveDown = { moveGroup(group, 1) },
                         )
+                    }
+                }
+                if (group == null || group !in collapsedGroups) {
+                    items(inGroup, key = { it.id }) { alarm ->
+                        Box(Modifier.padding(horizontal = 16.dp)) {
+                            AlarmRow(
+                                alarm = alarm,
+                                use24h = settings.use24h,
+                                order = settings.dayOrder(),
+                                onToggle = {
+                                    AlarmScheduler.save(
+                                        context,
+                                        alarm.copy(enabled = it, snoozedUntil = 0L, skipNext = false),
+                                    )
+                                },
+                                onClick = { editing = alarm },
+                            )
+                        }
                     }
                 }
             }
@@ -406,16 +456,18 @@ fun AlarmEditSheet(alarm: Alarm, onDismiss: () -> Unit, onDeleted: (Alarm) -> Un
         onDismiss()
     }
 
+    // Si apre a meta' (fino al gruppo): trascinare in alto rivela le altre
+    // opzioni, invece di spalancarsi subito fino al bordo dello schermo e
+    // coprire il selettore dell'ora.
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     ModalBottomSheet(
         onDismissRequest = ::dismiss,
-        // Si apre a meta' (fino al gruppo): trascinare in alto rivela le altre
-        // opzioni, invece di spalancarsi subito fino al bordo dello schermo e
-        // coprire il selettore dell'ora.
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.background,
     ) {
         AlarmEditor(
             alarm = alarm,
+            sheetState = sheetState,
             use24h = settings.use24h,
             order = settings.dayOrder(),
             onDraftChange = { current = it },
@@ -427,6 +479,53 @@ fun AlarmEditSheet(alarm: Alarm, onDismiss: () -> Unit, onDeleted: (Alarm) -> Un
                 }
                 onDismiss()
             },
+        )
+    }
+}
+
+/**
+ * Intestazione di un gruppo: nome, frecce per riordinarlo rispetto agli altri
+ * gruppi (settings.groupOrder) e una freccetta per comprimerlo/espanderlo -
+ * tutta la riga risponde al tocco per comprimere, le frecce hanno il loro
+ * click e lo intercettano prima che arrivi alla riga.
+ */
+@Composable
+private fun GroupHeader(
+    name: String,
+    collapsed: Boolean,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onToggleCollapse: () -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+) {
+    val rotation by animateFloatAsState(if (collapsed) -90f else 0f, label = "group-chevron")
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggleCollapse)
+            .padding(start = 24.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            name.uppercase(),
+            Modifier.weight(1f).padding(vertical = 12.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        DotIconButton(
+            Icons.Outlined.KeyboardArrowUp, "Sposta su", onMoveUp,
+            size = 32, color = Color.Transparent, enabled = canMoveUp,
+        )
+        DotIconButton(
+            Icons.Outlined.KeyboardArrowDown, "Sposta giu'", onMoveDown,
+            size = 32, color = Color.Transparent, enabled = canMoveDown,
+        )
+        Icon(
+            Icons.Outlined.ExpandMore,
+            if (collapsed) "Espandi" else "Comprimi",
+            Modifier.size(20.dp).padding(start = 4.dp).rotate(rotation),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -465,9 +564,11 @@ private fun AlarmRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AlarmEditor(
     alarm: Alarm,
+    sheetState: SheetState,
     use24h: Boolean,
     order: List<DayOfWeek>,
     onDraftChange: (Alarm) -> Unit,
@@ -704,6 +805,17 @@ private fun AlarmEditor(
         Row(
             Modifier
                 .align(Alignment.BottomCenter)
+                // Il Box sopra ha l'altezza dell'intero contenuto (per intero,
+                // non solo la parte visibile): quando il foglio e' "abbassato"
+                // (partiallyExpanded, per lasciare il selettore dell'ora a
+                // portata di pollice) l'intera superficie - bordo inferiore
+                // compreso - trasla verso il basso di sheetState.offset,
+                // portando la barra sotto il bordo visibile dello schermo.
+                // Spostarla in senso opposto della stessa quantita' annulla
+                // quella traslazione: resta ancorata al fondo dello schermo a
+                // qualunque punto del trascinamento, non solo a foglio aperto
+                // del tutto.
+                .offset { IntOffset(0, -runCatching { sheetState.requireOffset() }.getOrDefault(0f).roundToInt()) }
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(horizontal = 16.dp)

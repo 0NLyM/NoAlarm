@@ -75,6 +75,7 @@ class AlarmService : Service() {
         runCatching {
             NotificationManagerCompat.from(this).notify(NotificationHelper.ID_RINGING, NotificationHelper.ringing(this, alarm))
         }
+        if (alarm.ringOnWatch) repeatEcho(alarm)
 
         wakeLock = getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "noalarm:ring")
@@ -130,6 +131,29 @@ class AlarmService : Service() {
                 if (volume < 1f) handler.postDelayed(this, 900)
             }
         }, 900)
+    }
+
+    /**
+     * Ripubblica la notifica dell'eco ogni pochi secondi, cosi' il watch
+     * (dove il bridging su CH_ALARM_WATCH e' confermato funzionante, vedi
+     * Causa 15/16) vibra di nuovo a ogni ripubblicazione invece che una sola
+     * volta al recapito - l'API notifiche non supporta un ripetersi continuo
+     * per design, quindi l'unico modo per farla "vibrare finche' non si
+     * spegne/posticipa" e' rinnovarla a intervalli, non un flag o un canale
+     * diverso. Il percorso Data Layer/RingActivity pensato per questo (vedi
+     * CLAUDE.md) risulta invece non arrivare affatto su questo watch.
+     */
+    private fun repeatEcho(alarm: Alarm) {
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+                if (ringing.value != alarm.id) return
+                runCatching {
+                    NotificationManagerCompat.from(this@AlarmService)
+                        .notify(NotificationHelper.ID_RINGING, NotificationHelper.ringing(this@AlarmService, alarm))
+                }
+                handler.postDelayed(this, 3000)
+            }
+        }, 3000)
     }
 
     private fun vibrate() {

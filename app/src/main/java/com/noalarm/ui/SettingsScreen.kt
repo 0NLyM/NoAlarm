@@ -100,6 +100,11 @@ fun SettingsScreen() {
         SwitchRow("Suona anche sull'orologio", s.defaultRingOnWatch) { v ->
             Store.update { it.copy(defaultRingOnWatch = v) }
         }
+        RowItem(
+            title = "Posizione dei gruppi",
+            subtitle = if (s.groupsOnTop) "In cima all'elenco" else "In fondo all'elenco",
+            onClick = { Store.update { it.copy(groupsOnTop = !it.groupsOnTop) } },
+        )
         Text(
             "Valgono per le sveglie nuove. Rinvio, passo dei pulsanti, minimo, massimo, "
                 + "numero di rinvii e l'eco sul watch si regolano dentro ogni singola sveglia.",

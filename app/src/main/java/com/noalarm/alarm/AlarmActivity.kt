@@ -29,9 +29,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -57,11 +54,10 @@ import com.noalarm.data.Alarm
 import com.noalarm.data.KeyAction
 import com.noalarm.data.Store
 import com.noalarm.glyph.Matrix
-import com.noalarm.ui.DotButton
-import com.noalarm.ui.DotIconButton
 import com.noalarm.ui.DotPillButton
 import com.noalarm.ui.DotText
 import com.noalarm.ui.GlyphStylePreview
+import com.noalarm.ui.Knob
 import com.noalarm.ui.rememberNow
 import com.noalarm.ui.theme.NoAlarmTheme
 import kotlinx.coroutines.delay
@@ -70,9 +66,12 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.math.hypot
 
+/** Tacche della manopola di rinvio: 1..10, poi 15..60 di 5 in 5. */
+private val SNOOZE_KNOB_VALUES = (1..10) + (15..60 step 5)
+
 /**
  * Schermata a tutto schermo mentre la sveglia suona. Oltre a spegni/posticipa
- * offre i pulsanti +/- per cambiare i minuti di rinvio prima di posticipare,
+ * offre una manopola per cambiare i minuti di rinvio prima di posticipare,
  * e risponde ai tasti fisici secondo le impostazioni.
  */
 class AlarmActivity : ComponentActivity() {
@@ -174,7 +173,13 @@ private fun Ringing(
     val settings by Store.settings.collectAsStateWithLifecycle()
     val snoozes by AlarmService.snoozeCount.collectAsStateWithLifecycle()
     val now = rememberNow(1000L)
-    var minutes by remember { mutableIntStateOf(alarm.snoozeMinutes) }
+    val snoozeValues = remember(alarm.snoozeMinMinutes, alarm.snoozeMaxMinutes) {
+        SNOOZE_KNOB_VALUES.filter { it in alarm.snoozeMinMinutes..alarm.snoozeMaxMinutes }
+            .ifEmpty { listOf(alarm.snoozeMinMinutes) }
+    }
+    // I minuti di partenza (impostazione libera 1..60) possono non cadere su
+    // una tacca della manopola: si parte dalla piu' vicina.
+    var minutes by remember { mutableIntStateOf(snoozeValues.minBy { kotlin.math.abs(it - alarm.snoozeMinutes) }) }
     val pulse by rememberInfiniteTransition("pulse").animateFloat(
         initialValue = 0.35f,
         targetValue = 1f,
@@ -229,7 +234,8 @@ private fun Ringing(
                 Spacer(Modifier.weight(0.5f))
             }
 
-            // Regolazione del rinvio con i pulsanti, alla Samsung.
+            // Regolazione del rinvio con una manopola: si ruota invece di
+            // toccare +/- una volta per passo.
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     if (outOfSnoozes) "RINVII ESAURITI" else "RINVIA DI",
@@ -237,18 +243,13 @@ private fun Ringing(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                Knob(
+                    values = snoozeValues,
+                    selected = minutes,
+                    enabled = !outOfSnoozes,
+                    onChange = { minutes = it; onSnoozeChange(it) },
+                    diameter = 180.dp,
                 ) {
-                    val step = alarm.snoozeStepMinutes
-                    val less = {
-                        minutes = (minutes - step).coerceAtLeast(alarm.snoozeMinMinutes)
-                        onSnoozeChange(minutes)
-                    }
-                    val canLess = !outOfSnoozes && minutes > alarm.snoozeMinMinutes
-                    if (step > 1) DotButton("-$step", less, size = 56, enabled = canLess)
-                    else DotIconButton(Icons.Outlined.Remove, "Rinvia di meno", less, size = 56, enabled = canLess)
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         DotText(
                             minutes.toString(),
@@ -259,13 +260,6 @@ private fun Ringing(
                         Text("MIN", style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    val more = {
-                        minutes = (minutes + step).coerceAtMost(alarm.snoozeMaxMinutes)
-                        onSnoozeChange(minutes)
-                    }
-                    val canMore = !outOfSnoozes && minutes < alarm.snoozeMaxMinutes
-                    if (step > 1) DotButton("+$step", more, size = 56, enabled = canMore)
-                    else DotIconButton(Icons.Outlined.Add, "Rinvia di piu'", more, size = 56, enabled = canMore)
                 }
                 if (snoozes > 0) {
                     Spacer(Modifier.height(8.dp))

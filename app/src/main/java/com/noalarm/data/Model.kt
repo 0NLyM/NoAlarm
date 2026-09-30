@@ -36,8 +36,7 @@ data class Alarm(
     val snoozeMinutes: Int = 10,
     /** 0 = non silenziare mai. */
     val autoSilenceMinutes: Int = 10,
-    // Regolazione del rinvio con i pulsanti +/- mentre suona: per singola sveglia.
-    val snoozeStepMinutes: Int = 1,
+    // Intervallo di rinvio scelto con la manopola mentre suona: per singola sveglia.
     val snoozeMinMinutes: Int = 1,
     val snoozeMaxMinutes: Int = 60,
     /** 0 = rinvii illimitati. */

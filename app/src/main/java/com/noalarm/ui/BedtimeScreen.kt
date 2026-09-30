@@ -186,9 +186,6 @@ fun BedtimeScreen() {
         StepperRow("Minuti di partenza", "${wake.snoozeMinutes} min", 1, 60, wake.snoozeMinutes) {
             updateWake { a -> a.copy(snoozeMinutes = it) }
         }
-        StepperRow("Passo dei pulsanti", "${wake.snoozeStepMinutes} min", 1, 15, wake.snoozeStepMinutes) {
-            updateWake { a -> a.copy(snoozeStepMinutes = it) }
-        }
         StepperRow("Minimo", "${wake.snoozeMinMinutes} min", 1, 30, wake.snoozeMinMinutes) {
             updateWake { a -> a.copy(snoozeMinMinutes = it, snoozeMaxMinutes = maxOf(it, a.snoozeMaxMinutes)) }
         }

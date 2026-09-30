@@ -137,7 +137,6 @@ object Store {
         put("label", a.label); put("soundUri", a.soundUri ?: JSONObject.NULL)
         put("vibrate", a.vibrate); put("gradualVolume", a.gradualVolume)
         put("snoozeMinutes", a.snoozeMinutes); put("autoSilenceMinutes", a.autoSilenceMinutes)
-        put("snoozeStepMinutes", a.snoozeStepMinutes)
         put("snoozeMinMinutes", a.snoozeMinMinutes); put("snoozeMaxMinutes", a.snoozeMaxMinutes)
         put("snoozeLimit", a.snoozeLimit)
         put("glyph", a.glyph); put("glyphStyle", a.glyphStyle.name)
@@ -158,7 +157,6 @@ object Store {
         gradualVolume = o.optBoolean("gradualVolume", true),
         snoozeMinutes = o.optInt("snoozeMinutes", 10),
         autoSilenceMinutes = o.optInt("autoSilenceMinutes", 10),
-        snoozeStepMinutes = o.optInt("snoozeStepMinutes", 1),
         snoozeMinMinutes = o.optInt("snoozeMinMinutes", 1),
         snoozeMaxMinutes = o.optInt("snoozeMaxMinutes", 60),
         snoozeLimit = o.optInt("snoozeLimit", 0),

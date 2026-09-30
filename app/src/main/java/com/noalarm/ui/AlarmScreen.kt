@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -491,14 +492,20 @@ private fun AlarmEditor(
         }
     }
 
-    Column(Modifier.fillMaxWidth()) {
+    // Box invece di Column+weight: la barra dei comandi va sovrapposta come
+    // overlay ancorato al bordo inferiore, non messa in coda al contenuto
+    // scrollabile - con weight() spariva e ricompariva durante il trascinamento
+    // del foglio, perche' la sua posizione dipendeva dall'altezza (in
+    // continuo ricalcolo mentre il foglio si espande/contrae) della colonna
+    // sopra di lei invece che dal bordo del contenitore.
+    Box(Modifier.fillMaxWidth()) {
         Column(
-            // fill = false: la barra dei comandi resta sempre visibile in basso,
-            // qualunque sia l'altezza del contenuto.
             Modifier
-                .weight(1f, fill = false)
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 16.dp)
+                // Spazio per non finire sotto la barra sovrapposta in fondo.
+                .padding(bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Il selettore a griglia sostituisce il rullo verticale solo in 24h: le
@@ -678,9 +685,6 @@ private fun AlarmEditor(
             StepperRow("Minuti di partenza", "${draft.snoozeMinutes} min", 1, 60, draft.snoozeMinutes) {
                 draft = draft.copy(snoozeMinutes = it)
             }
-            StepperRow("Passo dei pulsanti", "${draft.snoozeStepMinutes} min", 1, 15, draft.snoozeStepMinutes) {
-                draft = draft.copy(snoozeStepMinutes = it)
-            }
             StepperRow("Minimo", "${draft.snoozeMinMinutes} min", 1, 30, draft.snoozeMinMinutes) {
                 draft = draft.copy(
                     snoozeMinMinutes = it,
@@ -695,12 +699,15 @@ private fun AlarmEditor(
                 if (draft.snoozeLimit == 0) "Illimitati" else "${draft.snoozeLimit}",
                 0, 10, draft.snoozeLimit,
             ) { draft = draft.copy(snoozeLimit = it) }
-
-            Spacer(Modifier.height(8.dp))
         }
 
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 20.dp),
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 16.dp)
+                .padding(top = 8.dp, bottom = 20.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
